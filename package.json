@@ -1,0 +1,53 @@
+{
+  "name": "acyclic-eval",
+  "version": "0.1.0-alpha.1",
+  "description": "A mutation-based evaluation framework for measuring a judge's (LLM- or rule-based) accuracy without depending on the judge itself.",
+  "keywords": [
+    "evaluation",
+    "llm",
+    "llm-judge",
+    "mutation-testing",
+    "testing",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "shiki-yusuke",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shiki-yusuke/acyclic-eval.git"
+  },
+  "homepage": "https://github.com/shiki-yusuke/acyclic-eval#readme",
+  "bugs": {
+    "url": "https://github.com/shiki-yusuke/acyclic-eval/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "acyclic-eval": "./dist/src/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && vitest run",
+    "test:watch": "vitest",
+    "example": "npm run build && node dist/examples/toy/run.js",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
