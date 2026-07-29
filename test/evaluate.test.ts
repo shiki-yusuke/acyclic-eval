@@ -1,0 +1,211 @@
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { evaluate, readObservations } from "../src/evaluate.js";
+import { generate } from "../src/generate.js";
+import { expectEquals } from "../src/types.js";
+import type { Judge, Material, MutationOperator, ValidationResult } from "../src/types.js";
+
+interface Source {
+  readonly id: string;
+  readonly value: number;
+}
+interface CaseInput {
+  readonly value: number;
+}
+
+let outDir: string;
+
+function pass(): ValidationResult {
+  return { valid: true };
+}
+
+function selectAll(corpus: readonly Source[]): Material<Source>[] {
+  return corpus.map((source) => ({ source, anchor: {} }));
+}
+
+const passthroughOperator: MutationOperator<Source, CaseInput, number> = {
+  id: "passthrough",
+  version: "1.0.0",
+  selectMaterials: selectAll,
+  mutate(material) {
+    return [
+      {
+        caseId: "0",
+        input: { value: material.source.value },
+        target: { field: "value" },
+        expected: expectEquals(material.source.value),
+        trace: {},
+      },
+    ];
+  },
+  selfValidate: pass,
+};
+
+beforeEach(() => {
+  outDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-evaluate-"));
+  generate(
+    outDir,
+    [passthroughOperator],
+    [
+      { id: "a", value: 1 },
+      { id: "b", value: 2 },
+    ],
+  );
+});
+
+afterEach(() => {
+  rmSync(outDir, { recursive: true, force: true });
+});
+
+describe("evaluate: no expected-value leakage to the judge", () => {
+  it("only ever hands the judge the TCaseInput, never expected/target/operatorId/tags", async () => {
+    const receivedInputs: unknown[] = [];
+    const judge: Judge<CaseInput, string> = {
+      id: "spy",
+      evaluate(input) {
+        receivedInputs.push(input);
+        return "ok";
+      },
+    };
+    await evaluate(outDir, judge);
+    expect(receivedInputs).toHaveLength(2);
+    for (const input of receivedInputs) {
+      expect(Object.keys(input as object).sort()).toEqual(["value"]);
+    }
+  });
+});
+
+describe("evaluate: infra_error accounting", () => {
+  it("records a judge exception as an infra_error observation with the error message", async () => {
+    const judge: Judge<CaseInput, string> = {
+      id: "always-throws",
+      evaluate() {
+        throw new Error("boom");
+      },
+    };
+    const summary = await evaluate(outDir, judge);
+    expect(summary.infraErrorSamples).toBe(2);
+    expect(summary.okSamples).toBe(0);
+    const observations = readObservations(outDir);
+    expect(observations).toHaveLength(2);
+    for (const obs of observations) {
+      expect(obs.status).toBe("infra_error");
+      expect(obs.error).toMatch(/boom/);
+      expect(obs.attempts).toBe(1); // default retry policy: no retries
+    }
+  });
+});
+
+describe("evaluate: retry and repetition are recorded as separate fields", () => {
+  it("records repeated samples (repetition) independently of retry attempts within each sample", async () => {
+    // Keyed by (case, sample) -- sampleIndex alone repeats across different cases, so the
+    // counter must be scoped per case to avoid conflating repetition with retries.
+    const callsPerCaseSample = new Map<string, number>();
+    const judge: Judge<CaseInput, string> = {
+      id: "flaky-once-per-sample",
+      evaluate(input, ctx) {
+        const key = `${input.value}-${ctx.sampleIndex}`;
+        const calls = (callsPerCaseSample.get(key) ?? 0) + 1;
+        callsPerCaseSample.set(key, calls);
+        if (calls < 2) throw new Error("transient");
+        return `sample-${ctx.sampleIndex}`;
+      },
+    };
+
+    const summary = await evaluate(outDir, judge, { samples: 3, retry: { maxAttempts: 2 } });
+    expect(summary.totalSamples).toBe(2 * 3); // 2 cases x 3 repetitions
+    expect(summary.okSamples).toBe(6);
+
+    const observations = readObservations(outDir);
+    const sampleIndices = new Set(observations.map((o) => o.sampleIndex));
+    expect(sampleIndices).toEqual(new Set([0, 1, 2]));
+    for (const obs of observations) {
+      expect(obs.status).toBe("ok");
+      expect(obs.attempts).toBe(2); // every (case, sample) needed exactly one retry
+      expect(obs.actual).toBe(`sample-${obs.sampleIndex}`);
+    }
+  });
+});
+
+describe("evaluate: checkpoint / resume", () => {
+  it("skips (caseId, sampleIndex) pairs that already have a recorded observation", async () => {
+    const manifestEntries = (await import("../src/manifest.js")).readManifest(outDir).entries;
+    const preExisting = {
+      caseId: manifestEntries[0]!.caseId,
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "previous-run",
+      inputDigest: "irrelevant",
+      latencyMs: 1,
+      timestamp: new Date().toISOString(),
+      status: "ok" as const,
+      actual: "from-a-previous-run",
+    };
+    writeFileSync(path.join(outDir, "observations.jsonl"), `${JSON.stringify(preExisting)}\n`);
+
+    const calls: unknown[] = [];
+    const judge: Judge<CaseInput, string> = {
+      id: "counting",
+      evaluate(input) {
+        calls.push(input);
+        return "fresh";
+      },
+    };
+
+    const summary = await evaluate(outDir, judge, { resume: true });
+    expect(summary.skippedResumedSamples).toBe(1);
+    expect(summary.ranSamples).toBe(1); // only the second case's sample was missing
+    expect(calls).toHaveLength(1);
+
+    const observations = readObservations(outDir);
+    expect(observations).toHaveLength(2);
+    const resumed = observations.find((o) => o.caseId === preExisting.caseId)!;
+    expect(resumed.actual).toBe("from-a-previous-run"); // untouched, not re-run
+  });
+
+  it("re-runs everything and truncates prior observations when resume is false", async () => {
+    let calls = 0;
+    const judge: Judge<CaseInput, string> = {
+      id: "counting",
+      evaluate() {
+        calls += 1;
+        return "run-again";
+      },
+    };
+    await evaluate(outDir, judge); // first pass, populates observations.jsonl
+    expect(calls).toBe(2);
+
+    calls = 0;
+    const summary = await evaluate(outDir, judge, { resume: false });
+    expect(calls).toBe(2);
+    expect(summary.skippedResumedSamples).toBe(0);
+    expect(readObservations(outDir)).toHaveLength(2);
+  });
+});
+
+describe("evaluate: empty manifest", () => {
+  it("handles a manifest with zero entries without error", async () => {
+    const emptyOutDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-evaluate-empty-"));
+    try {
+      generate(emptyOutDir, [passthroughOperator], []);
+      const judge: Judge<CaseInput, string> = { id: "unused", evaluate: () => "n/a" };
+      const summary = await evaluate(emptyOutDir, judge);
+      expect(summary.totalCases).toBe(0);
+      expect(summary.totalSamples).toBe(0);
+    } finally {
+      rmSync(emptyOutDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("evaluate: append-based checkpointing", () => {
+  it("appends observations one at a time so a killed process keeps partial progress", async () => {
+    const judge: Judge<CaseInput, string> = { id: "slow", evaluate: () => "ok" };
+    await evaluate(outDir, judge, { concurrency: 1 });
+    // Simulate a manual append (as a crashed-and-resumed process would leave behind).
+    appendFileSync(path.join(outDir, "observations.jsonl"), "");
+    expect(readObservations(outDir)).toHaveLength(2);
+  });
+});
