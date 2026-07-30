@@ -25,6 +25,12 @@ export function formatReport(report: ScoreReport): { json: string; markdown: str
     lines.push("");
   }
 
+  if (report.dataQualityWarnings.length > 0) {
+    lines.push("## Data quality warnings", "");
+    for (const w of report.dataQualityWarnings) lines.push(`- ${w}`);
+    lines.push("");
+  }
+
   lines.push("## By operator", "");
   lines.push("| operator | selected | generated | valid | evaluated | infra_error | passed | pass rate |");
   lines.push("|---|---|---|---|---|---|---|---|");

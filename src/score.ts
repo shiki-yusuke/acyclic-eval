@@ -4,8 +4,10 @@
 
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { digestOfValue } from "./digest.js";
+import { AcyclicEvalError } from "./errors.js";
 import { readObservations } from "./evaluate.js";
-import { readManifest } from "./manifest.js";
+import { readArtifact, readManifest } from "./manifest.js";
 import { formatReport } from "./report.js";
 import type {
   CaseMismatch,
@@ -37,13 +39,44 @@ export function score<TExpected, TActual>(
   options: ScoreOptions<TExpected, TActual> = {},
 ): ScoreReport {
   const manifest = readManifest(outDir);
-  const observations = readObservations(outDir);
+  const { observations, tornTailDropped } = readObservations(outDir);
+  const dataQualityWarnings: string[] = tornTailDropped
+    ? [
+        "observations.jsonl had an incomplete trailing write (consistent with an interrupted " +
+          "evaluate() run) that was ignored. Re-run evaluate() with resume enabled to fill in the " +
+          "missing sample before trusting this report's coverage.",
+      ]
+    : [];
 
   const byCaseId = new Map<string, Observation[]>();
   for (const obs of observations) {
     const list = byCaseId.get(obs.caseId) ?? [];
     list.push(obs);
     byCaseId.set(obs.caseId, list);
+  }
+
+  // Re-verify every case that was actually evaluated against what's on disk *right now*.
+  // readArtifact() itself throws if the artifact's bytes no longer match the manifest's
+  // artifactDigest; comparing against each observation's recorded inputDigest additionally
+  // catches an artifact that was modified *after* evaluate() ran but still happens to match
+  // some (different) valid-looking content -- i.e. this is what actually makes good on the
+  // "evaluate/score can detect tampering" claim in docs/threat-model.md, not just evaluate().
+  for (const entry of manifest.entries) {
+    const obsForEntry = byCaseId.get(entry.caseId);
+    if (!obsForEntry || obsForEntry.length === 0) continue;
+    const currentInput = readArtifact<unknown>(outDir, entry);
+    const currentInputDigest = digestOfValue(currentInput);
+    for (const obs of obsForEntry) {
+      if (obs.status !== "ok") continue;
+      if (obs.inputDigest !== currentInputDigest) {
+        throw new AcyclicEvalError(
+          `tamper detected: case ${entry.caseId} (sample ${obs.sampleIndex}) was evaluated against a ` +
+            `different input than what is currently on disk (recorded inputDigest ${obs.inputDigest}, ` +
+            `current artifact hashes to ${currentInputDigest}). Refusing to score a possibly-modified ` +
+            `case -- re-run evaluate() against the current artifact.`,
+        );
+      }
+    }
   }
 
   const outcomes: EntryOutcome[] = manifest.entries.map((entry) => {
@@ -150,6 +183,9 @@ export function score<TExpected, TActual>(
       detail: o.lastDetail,
     }));
 
+  // Denominator is every operator in the manifest, not just the ones with materialsSelected > 0
+  // -- a zero-coverage operator must pull this ratio down, not be excluded from it (see
+  // ScoreOptions.minCoverage's doc comment in types.ts).
   const operatorsWithCoverage = byOperator.filter((o) => o.structurallyValid > 0).length;
   const coverageRatio = byOperator.length === 0 ? 1 : operatorsWithCoverage / byOperator.length;
   const overallPassRate = totalEvaluated === 0 ? 0 : totalPassed / totalEvaluated;
@@ -171,6 +207,7 @@ export function score<TExpected, TActual>(
     byOperator,
     confusionMatrix,
     coverageWarnings,
+    dataQualityWarnings,
     mismatches,
     pass,
   };

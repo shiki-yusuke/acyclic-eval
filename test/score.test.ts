@@ -1,11 +1,23 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { digestOfValue } from "../src/digest.js";
+import { AcyclicEvalError } from "../src/errors.js";
 import { generate } from "../src/generate.js";
+import { readArtifact } from "../src/manifest.js";
 import { score } from "../src/score.js";
 import { expectEquals, expectForbid, expectOneOf } from "../src/types.js";
-import type { Comparator, ExpectedSpec, Material, MetricAdapter, MutationOperator, Observation, ValidationResult } from "../src/types.js";
+import type {
+  Comparator,
+  ExpectedSpec,
+  ManifestEntry,
+  Material,
+  MetricAdapter,
+  MutationOperator,
+  Observation,
+  ValidationResult,
+} from "../src/types.js";
 
 interface Source {
   readonly id: string;
@@ -65,29 +77,33 @@ const actualById: Record<string, string> = {
 
 let outDir: string;
 
-function writeObservations(entries: Array<{ caseId: string; actual: string }>): void {
-  const lines = entries.map((e) => {
+// Writes observations with the *real* inputDigest of each entry's current artifact --
+// score() now cross-checks recorded inputDigest against a fresh read of the artifact
+// (tamper detection at score time), so a placeholder digest would make every test here
+// throw rather than exercise what it's meant to test.
+function writeRealObservations(dir: string, entries: readonly ManifestEntry[]): void {
+  const lines = entries.map((entry) => {
+    const input = readArtifact(dir, entry);
     const obs: Observation = {
-      caseId: e.caseId,
+      caseId: entry.caseId,
       sampleIndex: 0,
       attempts: 1,
       judgeId: "manual",
-      inputDigest: "irrelevant",
+      inputDigest: digestOfValue(input),
       latencyMs: 1,
       timestamp: new Date().toISOString(),
       status: "ok",
-      actual: e.actual,
+      actual: actualById[(entry.target as { id: string }).id]!,
     };
     return JSON.stringify(obs);
   });
-  writeFileSync(path.join(outDir, "observations.jsonl"), `${lines.join("\n")}\n`);
+  writeFileSync(path.join(dir, "observations.jsonl"), lines.length > 0 ? `${lines.join("\n")}\n` : "");
 }
 
 beforeEach(() => {
   outDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-"));
   const result = generate(outDir, [multiOperator], corpus);
-  const entries = result.manifest.entries.map((e) => ({ caseId: e.caseId, actual: actualById[(e.target as { id: string }).id]! }));
-  writeObservations(entries);
+  writeRealObservations(outDir, result.manifest.entries);
 });
 
 afterEach(() => {
@@ -174,24 +190,7 @@ describe("score: gates", () => {
         selfValidate: pass,
       };
       const entries = generate(outDir2, [multiOperator, neverOperator], corpus).manifest.entries;
-      writeFileSync(
-        path.join(outDir2, "observations.jsonl"),
-        entries
-          .map((e) =>
-            JSON.stringify({
-              caseId: e.caseId,
-              sampleIndex: 0,
-              attempts: 1,
-              judgeId: "manual",
-              inputDigest: "x",
-              latencyMs: 1,
-              timestamp: new Date().toISOString(),
-              status: "ok",
-              actual: actualById[(e.target as { id: string }).id]!,
-            }),
-          )
-          .join("\n"),
-      );
+      writeRealObservations(outDir2, entries);
       const report = score(outDir2, comparator, { minCoverage: 1 });
       expect(report.pass).toBe(false);
     } finally {
@@ -223,6 +222,37 @@ describe("score: confusion matrix via MetricAdapter", () => {
     };
     const report = score(outDir, comparator, { metricAdapter: alwaysNegativeAdapter });
     expect(report.confusionMatrix).toEqual({ tp: 0, tn: 5, fp: 0, fn: 0, precision: null, recall: null });
+  });
+});
+
+describe("score: observations.jsonl integrity", () => {
+  it("reports a torn trailing observation as a data quality warning instead of silently dropping it or throwing", () => {
+    const content = readFileSync(path.join(outDir, "observations.jsonl"), "utf8");
+    const withTornTail = `${content.trimEnd()}\n{"caseId":"garbage-not-clos`; // no trailing newline
+    writeFileSync(path.join(outDir, "observations.jsonl"), withTornTail);
+
+    const report = score(outDir, comparator);
+    expect(report.dataQualityWarnings.length).toBeGreaterThan(0);
+    expect(report.dataQualityWarnings[0]).toMatch(/incomplete trailing write/);
+  });
+
+  it("throws on non-tail corruption in observations.jsonl rather than silently under-reporting", () => {
+    writeFileSync(path.join(outDir, "observations.jsonl"), "not json\nmore not json\n");
+    expect(() => score(outDir, comparator)).toThrow(AcyclicEvalError);
+  });
+
+  it("throws when a case's artifact was modified after the observation referencing it was recorded", () => {
+    const entries = generate(outDir, [multiOperator], corpus).manifest.entries;
+    writeRealObservations(outDir, entries);
+    // Tamper with one artifact file directly, after observations were recorded against the
+    // original content -- readArtifact's own digest check would also catch this, but here we
+    // specifically exercise score()'s independent inputDigest cross-check.
+    const target = entries[0]!;
+    const artifactPath = path.join(outDir, target.artifactUri);
+    writeFileSync(artifactPath, JSON.stringify({ tag: "tampered-after-the-fact" }, null, 2));
+
+    expect(() => score(outDir, comparator)).toThrow(AcyclicEvalError);
+    expect(() => score(outDir, comparator)).toThrow(/tamper detected/);
   });
 });
 
