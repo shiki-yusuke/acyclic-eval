@@ -4,10 +4,13 @@ A mutation-based evaluation framework for measuring a judge's (LLM- or
 rule-based) accuracy without depending on the judge itself.
 
 > **Status: `0.1.0-alpha.2`.** Phase 1 (framework + a self-contained toy
-> example) plus Phase 2's real-world adapter hardening (async `selfValidate`,
-> judge-identity-aware resume, a per-operator gate, and manifest reader
-> defenses -- see [CHANGELOG.md](./CHANGELOG.md)). Not yet published to npm.
-> API may change before a stable release.
+> example) plus Phase 2 (a real-world adapter -- [evigate](https://github.com/shiki-yusuke/evigate)'s
+> mutation harness now runs on this framework, verified via a case-for-case
+> shadow-run comparison against its pre-adapter implementation; see
+> [CHANGELOG.md](./CHANGELOG.md) for the API changes that adapter needed:
+> async `selfValidate`, judge-identity-aware resume, a per-operator gate,
+> manifest reader defenses). Not yet published to npm; evigate's adapter
+> branch is not yet pushed. API may change before a stable release.
 
 ## Why acyclic?
 
@@ -143,34 +146,44 @@ corpora). Read [docs/threat-model.md](./docs/threat-model.md) before relying
 on a number this framework produces, especially the section on **what counts
 as "the judge"** if you're adapting this to claim/verdict-style domains.
 
-## Evaluation methodology this project inherited
+## Evaluation methodology this project inherited — and now drives directly
 
-`acyclic-eval`'s design is informed by the mutation-testing harness in
-[evigate](https://github.com/shiki-yusuke/evigate), a local CLI that verifies
-AI coding agents' "done" claims against execution evidence. That harness's
-own mutation-set result, at the commit where this framework's design was
-extracted ([`6fdd3dd`](https://github.com/shiki-yusuke/evigate/commit/6fdd3dd1d0a50a8d3002643f9835bc7d3413ff92)):
+`acyclic-eval`'s design started out extracted *from* the mutation-testing
+harness in [evigate](https://github.com/shiki-yusuke/evigate), a local CLI
+that verifies AI coding agents' "done" claims against execution evidence.
+As of Phase 2, that relationship has flipped: evigate's harness
+(`src/eval-adapters/` in evigate's repo, on its `acyclic-eval-adapter`
+branch) is now the first real adapter *built on* `acyclic-eval` --
+`evigate mutate` calls this package's `generate()` with eight
+`MutationOperator` implementations (M1-M8), and `evigate eval --mutations`
+calls `evaluate()`/`score()` against a detector-only `Judge` and an
+exact-match `Comparator`. The pre-adapter implementation (its own
+generate/evaluate/select logic, independent of this package) was deleted
+only after a case-for-case shadow-run comparison against it passed cleanly:
+
 **113/113 (100%) operator-level match rate, with the M4 operator at 0/0**
-(the corpus it drew from happened to contain no natural occurrence of the
-structural pattern M4 targets — not a failure, just zero coverage, exactly
-the kind of thing `score()`'s coverage warnings exist to surface honestly).
+(M1=3, M2=4, M3=19, M4=0, M5=19, M6=3, M7=51, M8=14 -- the corpus it drew
+from happened to contain no natural occurrence of the structural pattern M4
+targets, not a failure, just zero coverage, exactly the kind of thing
+`score()`'s coverage warnings exist to surface honestly).
 
-**This is a result about that other tool's mutation set, not about
-`acyclic-eval` itself.** `acyclic-eval` is a new, independent implementation;
-its own toy example passes 9/9 (see `npm run example`), but that's a
-demonstration corpus, not a benchmark claim.
+**This is now a result `acyclic-eval` itself produces**, via evigate's
+adapter -- not merely a number inherited from a separate, pre-`acyclic-eval`
+implementation (which is what this section described before Phase 2, and
+still an accurate description of *why* the M1-M8 design looks the way it
+does). `acyclic-eval`'s own toy example passes 9/9 (see `npm run example`),
+which remains a demonstration corpus, not a benchmark claim -- the 113/113
+result above is the real one.
 
 ## Roadmap
 
-- **Phase 2 (in progress):** an adapter for the evidence-verification tool
-  mentioned above, wiring its real (non-toy) judge/corpus into this framework
-  so its mutation results are produced by `acyclic-eval` itself rather than
-  inherited. `0.1.0-alpha.2`'s API changes (async `selfValidate`,
-  judge-identity-aware resume, `allowZeroGenerated`, manifest reader
-  defenses) were driven by that adapter's real requirements -- see
-  [CHANGELOG.md](./CHANGELOG.md).
+- **Phase 2 (complete):** the evigate adapter described above.
+  `0.1.0-alpha.2`'s API changes (async `selfValidate`, judge-identity-aware
+  resume, `allowZeroGenerated`, manifest reader defenses) were driven by
+  that adapter's real requirements -- see [CHANGELOG.md](./CHANGELOG.md).
 - Beyond that: additional example domains, a `next`-tagged npm prerelease
-  once the API stabilizes past alpha.
+  once the API stabilizes past alpha, and (pending a separate release
+  decision) publishing this package and pushing evigate's adapter branch.
 
 ## License
 
@@ -199,10 +212,11 @@ MIT — see [LICENSE](./LICENSE).
 toy ドメイン（簡易ルールベース判定器 + 3種のオペレータ）が generate → evaluate →
 score まで一気通貫で動作し、Markdown レポートが出力されます。
 
-現時点は Phase 1（フレームワーク本体 + toy example）のみで、npm 未公開のアルファ版
-です。README 中の「113/113」という実績数値は、本プロジェクトの設計源流となった
-**[evigate](https://github.com/shiki-yusuke/evigate) 自身の**（コミット
-[`6fdd3dd`](https://github.com/shiki-yusuke/evigate/commit/6fdd3dd1d0a50a8d3002643f9835bc7d3413ff92)
-時点の）mutation ハーネスの実績であり、`acyclic-eval` 自身の実績ではありません
-（`acyclic-eval` 自身の toy example は 9/9）。Phase 2 で evigate を本フレームワークの
-adapter として繋ぎ込み、`acyclic-eval` 自身の実績として測り直す予定です。
+現時点は Phase 1（フレームワーク本体 + toy example）+ Phase 2（evigate adapter）が完了した
+npm 未公開のアルファ版です。README 中の「113/113」は、当初は本プロジェクトの設計源流と
+なった **[evigate](https://github.com/shiki-yusuke/evigate) 自身の**実績でしたが、
+Phase 2 で evigate の mutation harness（`src/eval-adapters/`）自体を `acyclic-eval` の
+adapter として繋ぎ込んだことで、**現在は `acyclic-eval` 自身が生成する結果**になりました
+（旧実装は、その adapter とのケース単位 shadow-run 比較が一致することを確認したうえで
+削除済み）。`acyclic-eval` 自身の toy example は 9/9 で、これは実績値ではなく
+デモンストレーション用のコーパスです。evigate の adapter ブランチはまだ push していません。
