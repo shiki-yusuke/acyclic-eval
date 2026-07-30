@@ -4,6 +4,15 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0 (alpha); breaking changes between alpha releases are expected and
 are not accompanied by a deprecation period.
 
+## 0.1.0
+
+Same API as 0.1.0-alpha.2, promoted to stable. Between alpha.2 and this release the framework
+was dogfooded by refactoring [evigate](https://github.com/shiki-yusuke/evigate)'s built-in
+mutation evaluation into acyclic-eval adapters (8 operators, a detector-only judge, and an
+exact-match comparator). The full evigate corpus regression -- 113 cases across 8 operators,
+compared case-by-case (target, expected label, artifact digest, actual verdict) against the
+pre-refactor implementation -- passed 113/113, which is what qualifies this API as stable.
+
 ## 0.1.0-alpha.2
 
 Not published to npm (tarball-only; `npm pack` produces the artifact used to
@@ -56,7 +65,7 @@ dogfood this release from a consuming project before it's published).
 
 ## 0.1.0-alpha.1
 
-Initial local-only release (never published to npm). Framework core (types, generate/evaluate/
+Initial release, published to npm under the `next` dist-tag. Framework core (types, generate/evaluate/
 score pipeline, CLI, toy example) plus the fixes from the first Codex implementation review round
 (CLI config-loading separation, JSONL checkpoint/resume robustness, non-cooperative-abort tracking,
 score-time artifact tamper verification, manifest `target` field validation, Windows-safe artifact

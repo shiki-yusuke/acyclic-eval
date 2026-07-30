@@ -1,6 +1,6 @@
 {
   "name": "acyclic-eval",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0",
   "description": "A mutation-based evaluation framework for measuring a judge's (LLM- or rule-based) accuracy without depending on the judge itself.",
   "keywords": [
     "evaluation",
@@ -44,7 +44,6 @@
     "example": "npm run build && node dist/examples/toy/run.js",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
