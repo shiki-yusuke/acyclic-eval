@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AcyclicEvalError } from "../src/errors.js";
-import { artifactRelPath, readArtifact, readManifest, writeArtifact, writeManifest } from "../src/manifest.js";
+import { artifactRelPath, readArtifact, readManifest, resolveArtifactPath, writeArtifact, writeManifest } from "../src/manifest.js";
 import type { ManifestEntry } from "../src/types.js";
 
 let outDir: string;
@@ -82,6 +82,45 @@ describe("readManifest schema validation", () => {
     const manifest = readManifest(outDir);
     expect(manifest.entries[0]!.target).toBeNull();
   });
+
+  it("rejects a legacy (pre-acyclic-eval) manifest -- a bare JSON array of evigate-shaped mutant entries", () => {
+    const legacyEntries = [
+      {
+        mutant_id: "M1-session-abc-test_pass",
+        source_session: "session-abc",
+        mutant_session_id: "mut-m1-session-abc-test_pass",
+        operator: "M1",
+        claim_kind: "test_pass",
+        target_claim_turn: 3,
+        target_lines: [10, 11],
+        expected_verdict: "contradicted",
+        expected_reason_code: "D1",
+        mutant_file: "M1/session-abc-test_pass.jsonl",
+        notes: "removed the sole successful execution",
+      },
+    ];
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify(legacyEntries, null, 2));
+    expect(() => readManifest(outDir)).toThrow(AcyclicEvalError);
+    expect(() => readManifest(outDir)).toThrow(/legacy/);
+  });
+
+  it("rejects a bare JSON array manifest even without evigate-specific field names, still as an incompatible legacy format", () => {
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify([{ some: "other-shaped-array-entry" }]));
+    expect(() => readManifest(outDir)).toThrow(/bare JSON array/);
+  });
+
+  it("rejects an entry whose artifactUri resolves outside outDir (path escape)", () => {
+    const entry = { ...makeEntry(), artifactUri: "../../../etc/passwd" };
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify({ schemaVersion: 1, entries: [entry] }));
+    expect(() => readManifest(outDir)).toThrow(AcyclicEvalError);
+    expect(() => readManifest(outDir)).toThrow(/path escape/);
+  });
+
+  it("rejects an entry whose artifactUri is an absolute path", () => {
+    const entry = { ...makeEntry(), artifactUri: "/etc/passwd" };
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify({ schemaVersion: 1, entries: [entry] }));
+    expect(() => readManifest(outDir)).toThrow(/path escape/);
+  });
 });
 
 describe("artifact digest tamper detection", () => {
@@ -107,6 +146,26 @@ describe("artifact digest tamper detection", () => {
     const { artifactUri } = writeArtifact(outDir, "case-3", { lines: ["x"] });
     const raw = readFileSync(path.join(outDir, artifactUri), "utf8");
     expect(JSON.parse(raw)).toEqual({ lines: ["x"] });
+  });
+});
+
+describe("resolveArtifactPath / readArtifact: path escape defense in depth", () => {
+  it("resolveArtifactPath throws for a relative artifactUri that escapes outDir", () => {
+    expect(() => resolveArtifactPath(outDir, "../outside.json")).toThrow(AcyclicEvalError);
+    expect(() => resolveArtifactPath(outDir, "../outside.json")).toThrow(/path escape/);
+  });
+
+  it("resolveArtifactPath throws for an absolute artifactUri", () => {
+    expect(() => resolveArtifactPath(outDir, "/etc/passwd")).toThrow(/path escape/);
+  });
+
+  it("resolveArtifactPath accepts a normal within-outDir relative path", () => {
+    expect(() => resolveArtifactPath(outDir, "artifacts/case-1.json")).not.toThrow();
+  });
+
+  it("readArtifact refuses to read an artifact referenced by an escaping artifactUri, even if constructed directly (not via readManifest)", () => {
+    const entry = makeEntry({ artifactUri: "../outside.json" });
+    expect(() => readArtifact(outDir, entry)).toThrow(/path escape/);
   });
 });
 

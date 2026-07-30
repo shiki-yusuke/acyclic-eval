@@ -17,6 +17,26 @@ export function artifactRelPath(caseId: string): string {
   return path.posix.join(ARTIFACT_DIR, `${safe}.json`);
 }
 
+/**
+ * Resolves an `artifactUri` against `outDir` and refuses to return a path
+ * that escapes it -- a manifest is meant to be a self-contained, portable
+ * bundle, and there's no legitimate reason for an entry to point outside its
+ * own outDir (whether the escaping path got there by a hand-edited manifest,
+ * a buggy writer, or something adversarial).
+ */
+export function resolveArtifactPath(outDir: string, artifactUri: string): string {
+  const resolvedOutDir = path.resolve(outDir);
+  const resolvedPath = path.resolve(resolvedOutDir, artifactUri);
+  const relative = path.relative(resolvedOutDir, resolvedPath);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new AcyclicEvalError(
+      `manifest entry references an artifactUri ("${artifactUri}") that resolves outside outDir ` +
+        `("${outDir}"). Refusing to read it -- this looks like a path escape.`,
+    );
+  }
+  return resolvedPath;
+}
+
 export function writeArtifact(outDir: string, caseId: string, input: unknown): { artifactUri: string; artifactDigest: string } {
   const relPath = artifactRelPath(caseId);
   const fullPath = path.join(outDir, relPath);
@@ -27,7 +47,7 @@ export function writeArtifact(outDir: string, caseId: string, input: unknown): {
 }
 
 export function readArtifact<TCaseInput>(outDir: string, entry: ManifestEntry): TCaseInput {
-  const fullPath = path.join(outDir, entry.artifactUri);
+  const fullPath = resolveArtifactPath(outDir, entry.artifactUri);
   const content = readFileSync(fullPath, "utf8");
   const digest = sha256Hex(content);
   if (digest !== entry.artifactDigest) {
@@ -63,7 +83,7 @@ function isExpectedSpec(v: unknown): v is ExpectedSpec<unknown> {
   return false;
 }
 
-function assertManifestEntry(v: unknown, index: number): ManifestEntry {
+function assertManifestEntry(v: unknown, index: number, outDir: string): ManifestEntry {
   if (!isRecord(v)) throw new AcyclicEvalError(`manifest entry #${index} is not an object`);
   const required: Array<keyof ManifestEntry> = [
     "schemaVersion",
@@ -86,12 +106,20 @@ function assertManifestEntry(v: unknown, index: number): ManifestEntry {
   if (!Array.isArray(v.tags)) {
     throw new AcyclicEvalError(`manifest entry #${index} has a non-array "tags" field`);
   }
+  if (typeof v.artifactUri !== "string") {
+    throw new AcyclicEvalError(`manifest entry #${index} has a non-string "artifactUri" field`);
+  }
+  // Fail fast at load time, not only when something later happens to call readArtifact().
+  resolveArtifactPath(outDir, v.artifactUri);
   return v as unknown as ManifestEntry;
 }
 
 /**
  * Loads and validates a manifest. Rejects unknown schema versions explicitly
- * rather than guessing at forward/backward compatibility.
+ * rather than guessing at forward/backward compatibility, and rejects the
+ * legacy (pre-acyclic-eval) evigate mutation manifest format -- a bare JSON
+ * array of mutant entries -- with a specific message rather than the generic
+ * "not a JSON object" error a bare array would otherwise produce.
  */
 export function readManifest(outDir: string): Manifest {
   const fullPath = path.join(outDir, MANIFEST_FILE);
@@ -100,6 +128,19 @@ export function readManifest(outDir: string): Manifest {
     raw = JSON.parse(readFileSync(fullPath, "utf8"));
   } catch (err) {
     throw new AcyclicEvalError(`failed to read/parse manifest at ${fullPath}: ${(err as Error).message}`);
+  }
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    const looksLikeLegacyEvigateManifest = isRecord(first) && ("mutant_id" in first || "expected_verdict" in first);
+    throw new AcyclicEvalError(
+      `manifest at ${fullPath} is a bare JSON array` +
+        (looksLikeLegacyEvigateManifest
+          ? ` that looks like a legacy (pre-acyclic-eval) evigate mutation manifest (it has a "mutant_id"/` +
+            `"expected_verdict"-shaped entry)`
+          : "") +
+        `, not the { schemaVersion, entries, operatorStats } object acyclic-eval expects. This is an ` +
+        `incompatible legacy manifest format; regenerate it with the current generate()/\`acyclic-eval generate\`.`,
+    );
   }
   if (!isRecord(raw)) throw new AcyclicEvalError(`manifest at ${fullPath} is not a JSON object`);
   if (raw.schemaVersion !== CURRENT_SCHEMA_VERSION) {
@@ -110,7 +151,7 @@ export function readManifest(outDir: string): Manifest {
     );
   }
   if (!Array.isArray(raw.entries)) throw new AcyclicEvalError(`manifest at ${fullPath} has a non-array "entries" field`);
-  const entries = raw.entries.map((e, i) => assertManifestEntry(e, i));
+  const entries = raw.entries.map((e, i) => assertManifestEntry(e, i, outDir));
   const operatorStats = Array.isArray(raw.operatorStats) ? (raw.operatorStats as GenerationOperatorStats[]) : [];
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
