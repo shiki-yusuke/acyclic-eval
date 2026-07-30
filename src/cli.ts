@@ -107,6 +107,7 @@ function printUsage(): void {
       "  generate  --config <path> --out <dir>",
       "  evaluate  --config <path> --out <dir> [--samples N] [--concurrency N] [--timeout ms] [--retry N] [--no-resume]",
       "  score     --config <path> --out <dir> [--min-coverage 0..1] [--min-pass-rate 0..1]",
+      "                                        [--allow-zero-generated op1,op2,...]",
       "",
       "The config module at --config must export generateConfig()/evaluateConfig()/scoreConfig()",
       "as needed by the subcommand(s) you run -- see examples/toy/config.ts.",
@@ -128,7 +129,7 @@ async function main(): Promise<void> {
   switch (command) {
     case "generate": {
       const config = await loadGenerateConfig(flags.config);
-      const result = generate(outDir, config.operators, config.corpus);
+      const result = await generate(outDir, config.operators, config.corpus);
       console.log(`generated ${result.manifest.entries.length} case(s) into ${outDir}`);
       break;
     }
@@ -150,6 +151,13 @@ async function main(): Promise<void> {
         metricAdapter: config.metricAdapter,
         minCoverage: flags["min-coverage"] ? Number(flags["min-coverage"]) : undefined,
         minPassRate: flags["min-pass-rate"] ? Number(flags["min-pass-rate"]) : undefined,
+        allowZeroGenerated:
+          flags["allow-zero-generated"] !== undefined
+            ? flags["allow-zero-generated"]
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s !== "")
+            : undefined,
       });
       console.log(formatReport(report).markdown);
       if (!report.pass) process.exitCode = 1;
