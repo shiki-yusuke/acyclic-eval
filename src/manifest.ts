@@ -8,9 +8,12 @@ const MANIFEST_FILE = "manifest.json";
 const ARTIFACT_DIR = "artifacts";
 
 export function artifactRelPath(caseId: string): string {
-  // caseId already excludes path separators (operatorId/version are expected to be simple
-  // identifiers), but sanitize defensively so a malicious/odd operator id can't escape outDir.
-  const safe = caseId.replace(/[/\\]/g, "_");
+  // caseId (see case-id.ts) is `${operatorId}@${operatorVersion}:${sourceDigest16}:${localCaseId}`
+  // by construction, so it *always* contains ':' -- not just defensively-possible, but guaranteed.
+  // ':' is invalid in filenames on Windows (and reserved for drive letters), so this isn't optional
+  // sanitization for odd operator ids; it's required for every artifact file this function names.
+  // '/' and '\\' are stripped too, defensively, so a malicious/odd operator id can't escape outDir.
+  const safe = caseId.replace(/[/\\:]/g, "_");
   return path.posix.join(ARTIFACT_DIR, `${safe}.json`);
 }
 
@@ -70,6 +73,7 @@ function assertManifestEntry(v: unknown, index: number): ManifestEntry {
     "artifactUri",
     "artifactDigest",
     "sourceDigest",
+    "target",
     "expected",
     "tags",
   ];

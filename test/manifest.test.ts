@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AcyclicEvalError } from "../src/errors.js";
-import { readArtifact, readManifest, writeArtifact, writeManifest } from "../src/manifest.js";
+import { artifactRelPath, readArtifact, readManifest, writeArtifact, writeManifest } from "../src/manifest.js";
 import type { ManifestEntry } from "../src/types.js";
 
 let outDir: string;
@@ -67,6 +67,21 @@ describe("readManifest schema validation", () => {
     writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify({ schemaVersion: 1, entries: [entry] }));
     expect(() => readManifest(outDir)).toThrow(/expected/);
   });
+
+  it("rejects an entry missing the target field", () => {
+    const entry = makeEntry() as unknown as Record<string, unknown>;
+    delete entry.target;
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify({ schemaVersion: 1, entries: [entry] }));
+    expect(() => readManifest(outDir)).toThrow(AcyclicEvalError);
+    expect(() => readManifest(outDir)).toThrow(/target/);
+  });
+
+  it("accepts an entry whose target is JSON null (a legitimate value, distinct from an absent key)", () => {
+    const entry = { ...makeEntry(), target: null };
+    writeFileSync(path.join(outDir, "manifest.json"), JSON.stringify({ schemaVersion: 1, entries: [entry] }));
+    const manifest = readManifest(outDir);
+    expect(manifest.entries[0]!.target).toBeNull();
+  });
 });
 
 describe("artifact digest tamper detection", () => {
@@ -92,5 +107,19 @@ describe("artifact digest tamper detection", () => {
     const { artifactUri } = writeArtifact(outDir, "case-3", { lines: ["x"] });
     const raw = readFileSync(path.join(outDir, artifactUri), "utf8");
     expect(JSON.parse(raw)).toEqual({ lines: ["x"] });
+  });
+});
+
+describe("artifactRelPath: Windows-compatible filenames", () => {
+  it("strips ':' from caseId-derived filenames (caseId always contains ':' by construction, see case-id.ts)", () => {
+    const relPath = artifactRelPath("op@1.0.0:abcdef0123456789:0");
+    expect(relPath).not.toContain(":");
+    expect(relPath).toBe("artifacts/op@1.0.0_abcdef0123456789_0.json");
+  });
+
+  it("strips path separators defensively", () => {
+    const relPath = artifactRelPath("op/../../etc:passwd");
+    expect(relPath).not.toMatch(/[/\\]etc/);
+    expect(relPath.startsWith("artifacts/")).toBe(true);
   });
 });
