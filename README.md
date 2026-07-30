@@ -3,8 +3,11 @@
 A mutation-based evaluation framework for measuring a judge's (LLM- or
 rule-based) accuracy without depending on the judge itself.
 
-> **Status: `0.1.0-alpha.1`.** Phase 1 (framework + a self-contained toy
-> example). Not yet published to npm. API may change before a stable release.
+> **Status: `0.1.0-alpha.2`.** Phase 1 (framework + a self-contained toy
+> example) plus Phase 2's real-world adapter hardening (async `selfValidate`,
+> judge-identity-aware resume, a per-operator gate, and manifest reader
+> defenses -- see [CHANGELOG.md](./CHANGELOG.md)). Not yet published to npm.
+> API may change before a stable release.
 
 ## Why acyclic?
 
@@ -125,6 +128,12 @@ can be gamed by one that always answers the "safe" default.
 - `minCoverage` / `minPassRate` in `ScoreOptions` turn "an operator got zero
   coverage" or "the pass rate is below X" into a failing `report.pass`,
   instead of a warning that's easy to miss in a wall of green.
+- `allowZeroGenerated` is the per-operator version of the same idea:
+  `minCoverage`'s aggregate ratio can average away one operator that's
+  consistently at zero coverage (e.g. a fail-then-retry pattern a given
+  corpus never happens to contain). Listing that operator explicitly in
+  `allowZeroGenerated` says so on purpose; any *other* zero-coverage operator
+  still fails the gate.
 
 ## Threat model
 
@@ -153,9 +162,13 @@ demonstration corpus, not a benchmark claim.
 
 ## Roadmap
 
-- **Phase 2:** an adapter for the evidence-verification tool mentioned above,
-  wiring its real (non-toy) judge/corpus into this framework so its mutation
-  results are produced by `acyclic-eval` itself rather than inherited.
+- **Phase 2 (in progress):** an adapter for the evidence-verification tool
+  mentioned above, wiring its real (non-toy) judge/corpus into this framework
+  so its mutation results are produced by `acyclic-eval` itself rather than
+  inherited. `0.1.0-alpha.2`'s API changes (async `selfValidate`,
+  judge-identity-aware resume, `allowZeroGenerated`, manifest reader
+  defenses) were driven by that adapter's real requirements -- see
+  [CHANGELOG.md](./CHANGELOG.md).
 - Beyond that: additional example domains, a `next`-tagged npm prerelease
   once the API stabilizes past alpha.
 
