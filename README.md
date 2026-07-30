@@ -63,7 +63,20 @@ node dist/src/cli.js score    --config dist/examples/toy/config.js --out ./out -
 
 `generate` and `evaluate` are separate subcommands on purpose — see
 [Threat model](./docs/threat-model.md) for why running them as separate
-processes is the recommended setup, not just an implementation detail.
+processes is the recommended setup, not just an implementation detail. This
+is also why the config module exports three separate functions
+(`generateConfig()` / `evaluateConfig()` / `scoreConfig()`, see
+`examples/toy/config.ts`) instead of one flat object: `generate` only ever
+calls `generateConfig()`, so a judge module that `evaluateConfig()` loads via
+its own `import()` is never touched by the `generate` code path at all.
+
+`evaluate` is safe to re-run: `resume` (on by default) skips samples that
+already have a recorded observation, re-runs any whose case content has
+changed since that observation was recorded (reported as
+`staleObservationsInvalidated`), and tolerates a torn trailing line left by a
+process killed mid-write (repairing the file rather than choking on it) --
+anything else wrong with `observations.jsonl` is a hard error, not a silent
+skip.
 
 ## Concepts
 
@@ -80,6 +93,13 @@ content-addressed) → `evaluate(manifest, judge) → observations.jsonl` (raw
 judge output, one line per (case, sample)) → `score(observations, comparator)
 → report`. Re-running `score` with a different `comparator` re-grades the
 exact same observations without calling the judge again.
+
+`evaluate`'s `timeoutMs` hands your judge an `AbortSignal` but can't force it
+to actually stop -- a judge that ignores `ctx.signal` keeps running in the
+background after the timeout is recorded, which can push real concurrency
+above the configured limit. `runner.ts` logs a warning and exposes
+`getLeakedInFlightCount()` when this happens; see
+[docs/threat-model.md](./docs/threat-model.md#timeouts-assume-cooperation-non-cooperative-abort).
 
 ### Designing operators: recall side vs. precision side
 

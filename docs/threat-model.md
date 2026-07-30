@@ -33,10 +33,29 @@ have exposed it).
 `generate` and `evaluate` are separate CLI subcommands, and the recommended
 usage is to run them as **separate processes** (e.g. a CI job that runs
 `generate` with no judge credentials at all, followed by a second job that
-only has judge credentials and a read-only manifest). The manifest's
-`artifactDigest`/`sourceDigest` fields let `evaluate`/`score` detect if a
-generated case was modified after the fact, so even a compromised or buggy
-second process can't silently rewrite what was actually generated.
+only has judge credentials and a read-only manifest). This isn't just a
+suggestion in prose: the CLI's config-loading contract enforces it. A config
+module exposes `generateConfig()` / `evaluateConfig()` / `scoreConfig()` as
+separate functions (see `examples/toy/config.ts`), and each subcommand only
+ever calls the one it needs. If `evaluateConfig()` does its own `import()` of
+a judge module *inside* the function body (rather than the config module
+statically importing it at the top level), then running `generate` never
+loads that judge module into the process at all -- not "shares no data with
+it," but never executes its code in the first place. A config module that
+instead does `import { judge } from "./judge.js"` at its own top level
+defeats this even if `generate`'s code path never reads the resulting
+binding, because ES module evaluation runs a module's top-level code as soon
+as anything imports it, regardless of which export is actually used
+afterward.
+
+The manifest's `artifactDigest`/`sourceDigest` fields, together with each
+observation's `inputDigest`, let both `evaluate()` and `score()` detect if a
+generated case was modified after the fact: `evaluate()` re-verifies
+`artifactDigest` every time it reads an artifact to feed the judge (via
+`readArtifact()`), and `score()` independently re-reads every evaluated
+case's current artifact and refuses to score if its digest no longer matches
+what the recorded observation says it evaluated -- not just at generation
+time, but every time either command runs.
 
 ## Layer 3: re-scoring without re-running the judge
 
@@ -45,6 +64,40 @@ already-recorded judge outputs) and a `Comparator`. This means a comparator
 bug can be fixed and the report regenerated for free, without touching the
 (possibly expensive, possibly non-deterministic) judge calls at all — nothing
 about re-scoring can smuggle judge behavior back into generation.
+
+## Timeouts assume cooperation: non-cooperative abort
+
+`evaluate()`'s `timeoutMs` option works by handing the judge an `AbortSignal`
+(`ctx.signal`) and racing its call against a timer. If the timer wins, the
+runner records a timeout failure and moves on -- but it cannot force the
+judge's own call to actually stop. `ctx.signal` is advisory, exactly like
+`AbortSignal` everywhere else on the platform: a judge implementation has to
+check it (or pass it through to something that does, e.g. `fetch(url, {
+signal })`) for the abort to have any real effect.
+
+If a judge ignores `ctx.signal` entirely, its call keeps running in the
+background after the runner has already given up on it. Two concrete
+consequences:
+
+- **The result is discarded**, not double-counted: the abandoned call's
+  eventual resolution or rejection is not written to `observations.jsonl` --
+  only the timeout failure is. This is enforced by ordinary Promise semantics
+  (the race's winning branch is the only one that resolves the outer
+  promise), not something acyclic-eval has to work to guarantee.
+- **Effective concurrency can exceed the configured limit.** `runPool()`
+  moves on to the next item as soon as `evaluate()`'s per-item work resolves
+  -- which happens at the *timeout*, not when the judge's call actually
+  finishes. A non-cooperative judge under sustained timeouts can accumulate
+  far more truly-in-flight calls (open sockets, spawned processes, ...) than
+  `concurrency` was set to allow.
+
+`runner.ts` tracks this on a best-effort basis: every timeout that fires logs
+a `console.warn`, and `getLeakedInFlightCount()` reports how many timed-out
+calls haven't actually settled yet. This is observability, not mitigation --
+it cannot cancel or rate-limit a non-cooperative judge, only tell you it's
+happening. If your judge wraps a resource that can't be aborted (a
+subprocess without a kill switch, a synchronous CPU-bound loop), treat
+`timeoutMs` as "stop waiting," not "stop running."
 
 ## The limit: this is a structural guarantee, not a semantic one
 
