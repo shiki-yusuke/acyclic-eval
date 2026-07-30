@@ -157,7 +157,12 @@ export async function evaluate<TCaseInput, TActual>(
       continue;
     }
     const current = getArtifact(item.entry);
-    if (recorded.inputDigest === current.digest) {
+    const artifactMatches = recorded.inputDigest === current.digest;
+    // A recorded observation from a different judge identity says nothing about what THIS
+    // judge would produce for this case -- treat it exactly like an artifact mismatch: stale,
+    // not reusable.
+    const judgeMatches = recorded.judgeId === judge.id && recorded.judgeVersion === judge.version;
+    if (artifactMatches && judgeMatches) {
       skippedResumedSamples += 1;
     } else {
       staleObservationsInvalidated += 1;

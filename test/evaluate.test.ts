@@ -50,9 +50,9 @@ function realInputDigest(dir: string, entry: ManifestEntry): string {
   return digestOfValue(readArtifact(dir, entry));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   outDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-evaluate-"));
-  generate(
+  await generate(
     outDir,
     [passthroughOperator],
     [
@@ -144,7 +144,9 @@ describe("evaluate: checkpoint / resume", () => {
       caseId: targetEntry.caseId,
       sampleIndex: 0,
       attempts: 1,
-      judgeId: "previous-run",
+      // Must match the judge used below for this to count as a genuine skip rather than a
+      // judge-identity-mismatch staleness case (see the dedicated test for that below).
+      judgeId: "counting",
       inputDigest: realInputDigest(outDir, targetEntry),
       latencyMs: 1,
       timestamp: new Date().toISOString(),
@@ -229,6 +231,45 @@ describe("evaluate: checkpoint / resume", () => {
     const forTargetCase = observations.find((o) => o.caseId === targetEntry.caseId)!;
     expect(forTargetCase.actual).toBe("re-evaluated");
   });
+
+  it("treats a recorded observation as stale and re-runs it when the judge identity differs, even if the artifact is unchanged", async () => {
+    const manifestEntries = readManifest(outDir).entries;
+    const targetEntry = manifestEntries[0]!;
+    const preExisting = {
+      caseId: targetEntry.caseId,
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "judge-v1",
+      judgeVersion: "1.0.0",
+      inputDigest: realInputDigest(outDir, targetEntry), // artifact matches -- only the judge identity differs
+      latencyMs: 1,
+      timestamp: new Date().toISOString(),
+      status: "ok" as const,
+      actual: "from-judge-v1",
+    };
+    writeFileSync(path.join(outDir, "observations.jsonl"), `${JSON.stringify(preExisting)}\n`);
+
+    const calls: unknown[] = [];
+    const judgeV2: Judge<CaseInput, string> = {
+      id: "judge-v1",
+      version: "2.0.0", // same id, different version -- still a different identity
+      evaluate(input) {
+        calls.push(input);
+        return "from-judge-v2";
+      },
+    };
+
+    const summary = await evaluate(outDir, judgeV2, { resume: true });
+    expect(summary.staleObservationsInvalidated).toBe(1);
+    expect(summary.skippedResumedSamples).toBe(0);
+    expect(summary.ranSamples).toBe(2); // the judge-identity-stale one, plus the second case's missing sample
+    expect(calls).toHaveLength(2);
+
+    const { observations } = readObservations(outDir);
+    const forTargetCase = observations.find((o) => o.caseId === targetEntry.caseId)!;
+    expect(forTargetCase.actual).toBe("from-judge-v2");
+    expect(forTargetCase.judgeVersion).toBe("2.0.0");
+  });
 });
 
 describe("evaluate/score: tolerant JSONL parsing", () => {
@@ -280,7 +321,7 @@ describe("evaluate/score: tolerant JSONL parsing", () => {
       caseId: entryA!.caseId,
       sampleIndex: 0,
       attempts: 1,
-      judgeId: "previous-run",
+      judgeId: "counting", // must match the judge used below to be a genuine skip, not judge-identity staleness
       inputDigest: realInputDigest(outDir, entryA!),
       latencyMs: 1,
       timestamp: new Date().toISOString(),
@@ -323,7 +364,7 @@ describe("evaluate: empty manifest", () => {
   it("handles a manifest with zero entries without error", async () => {
     const emptyOutDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-evaluate-empty-"));
     try {
-      generate(emptyOutDir, [passthroughOperator], []);
+      await generate(emptyOutDir, [passthroughOperator], []);
       const judge: Judge<CaseInput, string> = { id: "unused", evaluate: () => "n/a" };
       const summary = await evaluate(emptyOutDir, judge);
       expect(summary.totalCases).toBe(0);
