@@ -101,6 +101,16 @@ export interface JudgeContext {
 export interface Judge<TCaseInput, TActual> {
   readonly id: string;
   readonly version?: string;
+  /**
+   * `ctx.signal` fires when `evaluate()`'s configured `timeoutMs` elapses.
+   * Honoring it (aborting whatever request/computation is in flight) is
+   * the judge's responsibility, not something acyclic-eval can force: a
+   * judge that ignores `ctx.signal` keeps running in the background after
+   * the runner has already given up on it and recorded a timeout failure.
+   * Its eventual result is discarded, but real (not just reported)
+   * concurrency can exceed the configured `concurrency` limit until it
+   * settles -- see docs/threat-model.md's "non-cooperative abort" section.
+   */
   evaluate(input: TCaseInput, ctx: JudgeContext): Promise<TActual> | TActual;
 }
 
@@ -196,6 +206,14 @@ export interface EvaluateSummary {
   readonly totalSamples: number;
   readonly ranSamples: number;
   readonly skippedResumedSamples: number;
+  /**
+   * Samples that had a prior recorded observation but were re-run anyway
+   * because the case's artifact hashes differently now than when that
+   * observation was recorded (e.g. the artifact was regenerated or
+   * modified between evaluate() runs). These are included in `ranSamples`,
+   * not `skippedResumedSamples`.
+   */
+  readonly staleObservationsInvalidated: number;
   readonly okSamples: number;
   readonly infraErrorSamples: number;
 }
@@ -243,6 +261,15 @@ export interface ScoreReport {
   readonly byOperator: readonly OperatorCoverage[];
   readonly confusionMatrix?: ConfusionMatrix;
   readonly coverageWarnings: readonly string[];
+  /**
+   * Non-fatal integrity notes about observations.jsonl itself (e.g. a torn
+   * trailing write from an interrupted evaluate() run was ignored). Distinct
+   * from coverageWarnings, which are about operator coverage, not file
+   * integrity. Non-tail corruption is never reported here -- it's a thrown
+   * AcyclicEvalError instead, since silently dropping it would be worse than
+   * refusing to score.
+   */
+  readonly dataQualityWarnings: readonly string[];
   readonly mismatches: readonly CaseMismatch[];
   /** false when a coverage/pass-rate gate configured via ScoreOptions fails. */
   readonly pass: boolean;
@@ -250,7 +277,37 @@ export interface ScoreReport {
 
 export interface ScoreOptions<TExpected, TActual> {
   readonly metricAdapter?: MetricAdapter<TExpected, TActual>;
-  /** Minimum `structurallyValid > 0` proportion of operators with materialsSelected > 0; also fails on any zero-generated operator when set. */
+  /**
+   * Minimum required value (0..1) of `coverageRatio = (# operators with
+   * structurallyValid > 0) / (total # operators in the manifest)`. Setting
+   * this to `1` means every operator in the pipeline must have produced at
+   * least one structurally-valid case, or the gate fails. Operators that
+   * selected zero materials still count in the denominator (and count
+   * against the ratio), so a corpus that doesn't exercise every operator
+   * will correctly fail this gate rather than being averaged away.
+   */
   readonly minCoverage?: number;
   readonly minPassRate?: number;
+}
+
+/**
+ * Config module contract for the CLI. Each piece is its own async function
+ * rather than a single flat object so that `acyclic-eval generate` never has
+ * to import (even transitively) whatever `evaluateConfig()` pulls in to
+ * build a Judge -- see docs/threat-model.md's "process/entry-point
+ * separation" section. A config module only needs to export the function(s)
+ * the subcommands you actually run require.
+ */
+export interface GenerateConfig<TSource, TCaseInput, TExpected> {
+  readonly corpus: readonly TSource[];
+  readonly operators: ReadonlyArray<MutationOperator<TSource, TCaseInput, TExpected>>;
+}
+
+export interface EvaluateConfig<TCaseInput, TActual> {
+  readonly judge: Judge<TCaseInput, TActual>;
+}
+
+export interface ScoreConfig<TExpected, TActual> {
+  readonly comparator: Comparator<TExpected, TActual>;
+  readonly metricAdapter?: MetricAdapter<TExpected, TActual>;
 }
