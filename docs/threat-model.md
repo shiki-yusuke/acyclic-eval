@@ -77,8 +77,8 @@ which materials are structurally eligible.**
 - Fine: independently-authored structural anchors, or human annotation.
 - **Not fine:** using an extractor that is part of the same pipeline as the
   judge under test to decide `target`, even if that extractor "just" finds
-  claims rather than scoring them. evigate's `RuleBasedClaimExtractor` is
-  exactly this trap: it is a legitimate *input* to claim-based detectors
+  claims rather than scoring them. [evigate](https://github.com/shiki-yusuke/evigate)'s
+  `RuleBasedClaimExtractor` is exactly this trap: it is a legitimate *input* to claim-based detectors
   (you need it to find claims to mutate at all), but if the *same* claims it
   extracts are later used to grade whether the detector's *verdicts* were
   correct, the extractor has silently become part of the thing being judged.

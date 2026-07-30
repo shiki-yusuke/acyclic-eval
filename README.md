@@ -15,9 +15,10 @@ classifier has a bug, that bug can quietly disqualify the very test cases
 that would have exposed it — and a clean scorecard stops meaning anything.
 
 This isn't hypothetical. It's the exact failure this project generalizes from:
-an earlier mutation-testing harness (part of a different, evidence-verification
-tool) used the detector under evaluation both to *pick which cases to mutate*
-and to *decide whether a generated mutant was valid*. A bug in the detector
+an earlier mutation-testing harness (part of
+[evigate](https://github.com/shiki-yusuke/evigate), a different,
+evidence-verification tool) used the detector under evaluation both to *pick
+which cases to mutate* and to *decide whether a generated mutant was valid*. A bug in the detector
 could silently exclude mutants that would have revealed it — so a 100% match
 rate on that harness didn't actually mean 100% accuracy. Fixing that required
 redesigning generation so the detector is never consulted during mutant
@@ -115,10 +116,11 @@ as "the judge"** if you're adapting this to claim/verdict-style domains.
 
 ## Evaluation methodology this project inherited
 
-`acyclic-eval`'s design is informed by a mutation-testing harness built for a
-different (not-yet-public) tool — an evidence-based verifier for AI coding
-agents' "done" claims. That harness's own mutation-set result, at the commit
-where this framework's design was extracted (`6fdd3dd`, not yet public):
+`acyclic-eval`'s design is informed by the mutation-testing harness in
+[evigate](https://github.com/shiki-yusuke/evigate), a local CLI that verifies
+AI coding agents' "done" claims against execution evidence. That harness's
+own mutation-set result, at the commit where this framework's design was
+extracted ([`6fdd3dd`](https://github.com/shiki-yusuke/evigate/commit/6fdd3dd1d0a50a8d3002643f9835bc7d3413ff92)):
 **113/113 (100%) operator-level match rate, with the M4 operator at 0/0**
 (the corpus it drew from happened to contain no natural occurrence of the
 structural pattern M4 targets — not a failure, just zero coverage, exactly
@@ -151,9 +153,9 @@ MIT — see [LICENSE](./LICENSE).
 判定器の精度を測る仕組みが、判定器自身（あるいはそれと同じパイプライン）に依存して
 「何を正解とするか」を決めていると、判定器にバグがあった場合にそのバグを暴くはずの
 テストケース自体が静かに排除されてしまい、見かけ上の高い一致率が意味を持たなくなり
-ます。本プロジェクトはまさにこの失敗を経験した設計（別の非公開ツール向けの mutation
-ハーネス）を一般化したものです。詳細は [docs/threat-model.md](./docs/threat-model.md)
-を参照してください。
+ます。本プロジェクトはまさにこの失敗を経験した設計（[evigate](https://github.com/shiki-yusuke/evigate)
+向けの mutation ハーネス）を一般化したものです。詳細は
+[docs/threat-model.md](./docs/threat-model.md) を参照してください。
 
 設計の核は3つの役割の構造的分離です。`MutationOperator`（コーパスから構造的情報のみ
 で mutant を生成。judge を一切参照できない）、`Judge`（評価対象そのもの。入力ケース
@@ -166,6 +168,8 @@ score まで一気通貫で動作し、Markdown レポートが出力されま�
 
 現時点は Phase 1（フレームワーク本体 + toy example）のみで、npm 未公開のアルファ版
 です。README 中の「113/113」という実績数値は、本プロジェクトの設計源流となった
-**別ツールの** mutation ハーネスの実績であり、`acyclic-eval` 自身の実績ではありませ
-ん（`acyclic-eval` 自身の toy example は 9/9）。Phase 2 でその実ツールを本フレーム
-ワークの adapter として繋ぎ込み、`acyclic-eval` 自身の実績として測り直す予定です。
+**[evigate](https://github.com/shiki-yusuke/evigate) 自身の**（コミット
+[`6fdd3dd`](https://github.com/shiki-yusuke/evigate/commit/6fdd3dd1d0a50a8d3002643f9835bc7d3413ff92)
+時点の）mutation ハーネスの実績であり、`acyclic-eval` 自身の実績ではありません
+（`acyclic-eval` 自身の toy example は 9/9）。Phase 2 で evigate を本フレームワークの
+adapter として繋ぎ込み、`acyclic-eval` 自身の実績として測り直す予定です。
