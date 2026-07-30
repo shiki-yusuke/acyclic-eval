@@ -13,11 +13,11 @@ export interface GenerateResult {
   readonly operatorStats: readonly GenerationOperatorStats[];
 }
 
-export function generate<TSource, TCaseInput, TExpected>(
+export async function generate<TSource, TCaseInput, TExpected>(
   outDir: string,
   operators: ReadonlyArray<MutationOperator<TSource, TCaseInput, TExpected>>,
   corpus: readonly TSource[],
-): GenerateResult {
+): Promise<GenerateResult> {
   const entries: ManifestEntry[] = [];
   const operatorStats: GenerationOperatorStats[] = [];
   const seenGlobalCaseIds = new Set<string>();
@@ -47,7 +47,7 @@ export function generate<TSource, TCaseInput, TExpected>(
           continue;
         }
 
-        const validation = operator.selfValidate(material, candidate);
+        const validation = await operator.selfValidate(material, candidate);
         if (!validation.valid) {
           skipped.push({ caseId: candidate.caseId, reason: validation.reason ?? "selfValidate reported invalid (no reason given)" });
           continue;

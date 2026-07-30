@@ -22,7 +22,7 @@ afterEach(() => {
 
 describe("toy example: generate -> evaluate -> score", () => {
   it("runs end to end and the correct judge passes every generated case", async () => {
-    const generated = generate(outDir, toyOperators, toyCorpus);
+    const generated = await generate(outDir, toyOperators, toyCorpus);
     // 3 operators x 3 runs with a passing last "$ npm test" block (run-4 has no test command at all)
     expect(generated.manifest.entries).toHaveLength(9);
 
@@ -39,7 +39,7 @@ describe("toy example: generate -> evaluate -> score", () => {
   });
 
   it("a judge with the M5-style bug (also consults an earlier unrelated block) fails the precision-side operator", async () => {
-    generate(outDir, toyOperators, toyCorpus);
+    await generate(outDir, toyOperators, toyCorpus);
     // A deliberately buggy judge: reports "fail" if *any* block in the transcript failed,
     // ignoring recency. This should be caught by toy-inject-earlier-failure (precision side).
     const buggyJudge = {

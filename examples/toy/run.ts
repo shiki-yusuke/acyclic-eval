@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   const outDir = path.join(process.cwd(), ".acyclic-eval-example-out");
   rmSync(outDir, { recursive: true, force: true });
 
-  const generated = generate(outDir, toyOperators, toyCorpus);
+  const generated = await generate(outDir, toyOperators, toyCorpus);
   console.log(`[generate] wrote ${generated.manifest.entries.length} case(s) to ${outDir}`);
 
   const summary = await evaluate(outDir, toyJudge, { concurrency: 2 });
