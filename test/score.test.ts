@@ -100,9 +100,9 @@ function writeRealObservations(dir: string, entries: readonly ManifestEntry[]): 
   writeFileSync(path.join(dir, "observations.jsonl"), lines.length > 0 ? `${lines.join("\n")}\n` : "");
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   outDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-"));
-  const result = generate(outDir, [multiOperator], corpus);
+  const result = await generate(outDir, [multiOperator], corpus);
   writeRealObservations(outDir, result.manifest.entries);
 });
 
@@ -127,7 +127,7 @@ describe("score: equals / oneOf / forbid", () => {
 });
 
 describe("score: coverage warnings", () => {
-  it("flags an operator that selected zero materials", () => {
+  it("flags an operator that selected zero materials", async () => {
     const zeroOutDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-zero-"));
     try {
       const neverOperator: MutationOperator<Source, CaseInput, string> = {
@@ -137,7 +137,7 @@ describe("score: coverage warnings", () => {
         mutate: () => [],
         selfValidate: pass,
       };
-      generate(zeroOutDir, [neverOperator], corpus);
+      await generate(zeroOutDir, [neverOperator], corpus);
       writeFileSync(path.join(zeroOutDir, "observations.jsonl"), "");
       const report = score(zeroOutDir, comparator);
       expect(report.coverageWarnings.some((w) => w.includes("never") && w.includes("selected 0 materials"))).toBe(true);
@@ -146,7 +146,7 @@ describe("score: coverage warnings", () => {
     }
   });
 
-  it("flags an operator whose candidates all failed selfValidate, distinctly from zero-generated", () => {
+  it("flags an operator whose candidates all failed selfValidate, distinctly from zero-generated", async () => {
     const invalidOutDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-invalid-"));
     try {
       const alwaysInvalidOperator: MutationOperator<Source, CaseInput, string> = {
@@ -158,7 +158,7 @@ describe("score: coverage warnings", () => {
         ],
         selfValidate: () => ({ valid: false, reason: "always invalid for this test" }),
       };
-      generate(invalidOutDir, [alwaysInvalidOperator], corpus);
+      await generate(invalidOutDir, [alwaysInvalidOperator], corpus);
       writeFileSync(path.join(invalidOutDir, "observations.jsonl"), "");
       const report = score(invalidOutDir, comparator);
       expect(report.coverageWarnings.some((w) => w.includes("always-invalid") && w.includes("failed selfValidate"))).toBe(true);
@@ -179,7 +179,7 @@ describe("score: gates", () => {
     expect(report.pass).toBe(false);
   });
 
-  it("fails the gate when minCoverage requires full operator coverage and one operator has none", () => {
+  it("fails the gate when minCoverage requires full operator coverage and one operator has none", async () => {
     const outDir2 = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-gate2-"));
     try {
       const neverOperator: MutationOperator<Source, CaseInput, string> = {
@@ -189,13 +189,60 @@ describe("score: gates", () => {
         mutate: () => [],
         selfValidate: pass,
       };
-      const entries = generate(outDir2, [multiOperator, neverOperator], corpus).manifest.entries;
+      const entries = (await generate(outDir2, [multiOperator, neverOperator], corpus)).manifest.entries;
       writeRealObservations(outDir2, entries);
       const report = score(outDir2, comparator, { minCoverage: 1 });
       expect(report.pass).toBe(false);
     } finally {
       rmSync(outDir2, { recursive: true, force: true });
     }
+  });
+});
+
+describe("score: per-operator gate (allowZeroGenerated)", () => {
+  it("fails the gate on a zero-structurally-valid operator that is NOT in allowZeroGenerated", async () => {
+    const gateDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-perop-"));
+    try {
+      const neverOperator: MutationOperator<Source, CaseInput, string> = {
+        id: "never",
+        version: "1.0.0",
+        selectMaterials: () => [],
+        mutate: () => [],
+        selfValidate: pass,
+      };
+      const entries = (await generate(gateDir, [multiOperator, neverOperator], corpus)).manifest.entries;
+      writeRealObservations(gateDir, entries);
+      const report = score(gateDir, comparator, { allowZeroGenerated: [] });
+      expect(report.pass).toBe(false);
+    } finally {
+      rmSync(gateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("passes the gate on a zero-structurally-valid operator that IS in allowZeroGenerated", async () => {
+    const gateDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-perop2-"));
+    try {
+      const neverOperator: MutationOperator<Source, CaseInput, string> = {
+        id: "never",
+        version: "1.0.0",
+        selectMaterials: () => [],
+        mutate: () => [],
+        selfValidate: pass,
+      };
+      const entries = (await generate(gateDir, [multiOperator, neverOperator], corpus)).manifest.entries;
+      writeRealObservations(gateDir, entries);
+      const report = score(gateDir, comparator, { allowZeroGenerated: ["never"] });
+      expect(report.pass).toBe(true);
+    } finally {
+      rmSync(gateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not affect the gate at all when allowZeroGenerated is not provided", () => {
+    // outDir's fixture has no zero-generated operator, so this is really just confirming the
+    // absence of the option doesn't spuriously fail anything.
+    const report = score(outDir, comparator);
+    expect(report.pass).toBe(true);
   });
 });
 
@@ -241,8 +288,8 @@ describe("score: observations.jsonl integrity", () => {
     expect(() => score(outDir, comparator)).toThrow(AcyclicEvalError);
   });
 
-  it("throws when a case's artifact was modified after the observation referencing it was recorded", () => {
-    const entries = generate(outDir, [multiOperator], corpus).manifest.entries;
+  it("throws when a case's artifact was modified after the observation referencing it was recorded", async () => {
+    const entries = (await generate(outDir, [multiOperator], corpus)).manifest.entries;
     writeRealObservations(outDir, entries);
     // Tamper with one artifact file directly, after observations were recorded against the
     // original content -- readArtifact's own digest check would also catch this, but here we
@@ -256,11 +303,44 @@ describe("score: observations.jsonl integrity", () => {
   });
 });
 
+describe("score: mixed judge identities are rejected", () => {
+  it("throws when observations.jsonl contains more than one distinct judgeId/judgeVersion", async () => {
+    const entries = (await generate(outDir, [multiOperator], corpus)).manifest.entries;
+    const lines = entries.map((entry, i) => {
+      const input = readArtifact(outDir, entry);
+      const obs: Observation = {
+        caseId: entry.caseId,
+        sampleIndex: 0,
+        attempts: 1,
+        // Half the observations come from a different judge identity than the other half.
+        judgeId: i % 2 === 0 ? "judge-a" : "judge-b",
+        judgeVersion: "1.0.0",
+        inputDigest: digestOfValue(input),
+        latencyMs: 1,
+        timestamp: new Date().toISOString(),
+        status: "ok",
+        actual: actualById[(entry.target as { id: string }).id]!,
+      };
+      return JSON.stringify(obs);
+    });
+    writeFileSync(path.join(outDir, "observations.jsonl"), `${lines.join("\n")}\n`);
+
+    expect(() => score(outDir, comparator)).toThrow(AcyclicEvalError);
+    expect(() => score(outDir, comparator)).toThrow(/distinct judge identities/);
+  });
+
+  it("does not throw when every observation shares the same judgeId and judgeVersion (including both undefined)", () => {
+    // outDir's beforeEach fixture already writes every observation with judgeId "manual" and no
+    // judgeVersion -- a single consistent identity -- so scoring it must not throw.
+    expect(() => score(outDir, comparator)).not.toThrow();
+  });
+});
+
 describe("score: empty manifest", () => {
-  it("scores an empty manifest without error", () => {
+  it("scores an empty manifest without error", async () => {
     const emptyOutDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-score-empty-"));
     try {
-      generate(emptyOutDir, [multiOperator], []);
+      await generate(emptyOutDir, [multiOperator], []);
       writeFileSync(path.join(emptyOutDir, "observations.jsonl"), "");
       const report = score(emptyOutDir, comparator);
       expect(report.overall.totalCases).toBe(0);

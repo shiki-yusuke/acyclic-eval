@@ -48,6 +48,18 @@ export function score<TExpected, TActual>(
       ]
     : [];
 
+  // Observations recorded by more than one distinct judge identity would silently blend two
+  // different judges' results into one report -- never resolved automatically, no override flag.
+  const judgeIdentities = new Set(observations.map((obs) => `${obs.judgeId}@${obs.judgeVersion ?? ""}`));
+  if (judgeIdentities.size > 1) {
+    throw new AcyclicEvalError(
+      `observations.jsonl contains ${judgeIdentities.size} distinct judge identities ` +
+        `(${[...judgeIdentities].sort().join(", ")}). Scoring observations from more than one judge as a single ` +
+        `report would silently blend their results. Re-run evaluate() with resume: false against a single judge, ` +
+        `or split observations.jsonl by judge identity before scoring.`,
+    );
+  }
+
   const byCaseId = new Map<string, Observation[]>();
   for (const obs of observations) {
     const list = byCaseId.get(obs.caseId) ?? [];
@@ -193,6 +205,12 @@ export function score<TExpected, TActual>(
   let pass = true;
   if (options.minCoverage !== undefined && coverageRatio < options.minCoverage) pass = false;
   if (options.minPassRate !== undefined && overallPassRate < options.minPassRate) pass = false;
+  if (options.allowZeroGenerated !== undefined) {
+    const allowed = new Set(options.allowZeroGenerated);
+    for (const op of byOperator) {
+      if (op.structurallyValid === 0 && !allowed.has(op.operatorId)) pass = false;
+    }
+  }
 
   const report: ScoreReport = {
     schemaVersion: CURRENT_SCHEMA_VERSION,
