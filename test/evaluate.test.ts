@@ -2,10 +2,13 @@ import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { evaluate, readObservations } from "../src/evaluate.js";
+import { digestOfValue } from "../src/digest.js";
+import { AcyclicEvalError } from "../src/errors.js";
+import { evaluate, parseObservationsFile, readObservations } from "../src/evaluate.js";
 import { generate } from "../src/generate.js";
+import { readArtifact, readManifest } from "../src/manifest.js";
 import { expectEquals } from "../src/types.js";
-import type { Judge, Material, MutationOperator, ValidationResult } from "../src/types.js";
+import type { Judge, Material, ManifestEntry, MutationOperator, ValidationResult } from "../src/types.js";
 
 interface Source {
   readonly id: string;
@@ -42,6 +45,10 @@ const passthroughOperator: MutationOperator<Source, CaseInput, number> = {
   },
   selfValidate: pass,
 };
+
+function realInputDigest(dir: string, entry: ManifestEntry): string {
+  return digestOfValue(readArtifact(dir, entry));
+}
 
 beforeEach(() => {
   outDir = mkdtempSync(path.join(tmpdir(), "acyclic-eval-evaluate-"));
@@ -88,7 +95,7 @@ describe("evaluate: infra_error accounting", () => {
     const summary = await evaluate(outDir, judge);
     expect(summary.infraErrorSamples).toBe(2);
     expect(summary.okSamples).toBe(0);
-    const observations = readObservations(outDir);
+    const { observations } = readObservations(outDir);
     expect(observations).toHaveLength(2);
     for (const obs of observations) {
       expect(obs.status).toBe("infra_error");
@@ -118,7 +125,7 @@ describe("evaluate: retry and repetition are recorded as separate fields", () =>
     expect(summary.totalSamples).toBe(2 * 3); // 2 cases x 3 repetitions
     expect(summary.okSamples).toBe(6);
 
-    const observations = readObservations(outDir);
+    const { observations } = readObservations(outDir);
     const sampleIndices = new Set(observations.map((o) => o.sampleIndex));
     expect(sampleIndices).toEqual(new Set([0, 1, 2]));
     for (const obs of observations) {
@@ -130,14 +137,15 @@ describe("evaluate: retry and repetition are recorded as separate fields", () =>
 });
 
 describe("evaluate: checkpoint / resume", () => {
-  it("skips (caseId, sampleIndex) pairs that already have a recorded observation", async () => {
-    const manifestEntries = (await import("../src/manifest.js")).readManifest(outDir).entries;
+  it("skips (caseId, sampleIndex) pairs whose recorded inputDigest still matches the current artifact", async () => {
+    const manifestEntries = readManifest(outDir).entries;
+    const targetEntry = manifestEntries[0]!;
     const preExisting = {
-      caseId: manifestEntries[0]!.caseId,
+      caseId: targetEntry.caseId,
       sampleIndex: 0,
       attempts: 1,
       judgeId: "previous-run",
-      inputDigest: "irrelevant",
+      inputDigest: realInputDigest(outDir, targetEntry),
       latencyMs: 1,
       timestamp: new Date().toISOString(),
       status: "ok" as const,
@@ -156,10 +164,11 @@ describe("evaluate: checkpoint / resume", () => {
 
     const summary = await evaluate(outDir, judge, { resume: true });
     expect(summary.skippedResumedSamples).toBe(1);
+    expect(summary.staleObservationsInvalidated).toBe(0);
     expect(summary.ranSamples).toBe(1); // only the second case's sample was missing
     expect(calls).toHaveLength(1);
 
-    const observations = readObservations(outDir);
+    const { observations } = readObservations(outDir);
     expect(observations).toHaveLength(2);
     const resumed = observations.find((o) => o.caseId === preExisting.caseId)!;
     expect(resumed.actual).toBe("from-a-previous-run"); // untouched, not re-run
@@ -181,7 +190,132 @@ describe("evaluate: checkpoint / resume", () => {
     const summary = await evaluate(outDir, judge, { resume: false });
     expect(calls).toBe(2);
     expect(summary.skippedResumedSamples).toBe(0);
-    expect(readObservations(outDir)).toHaveLength(2);
+    expect(readObservations(outDir).observations).toHaveLength(2);
+  });
+
+  it("treats a recorded observation as stale and re-runs it when the case's artifact no longer matches", async () => {
+    const manifestEntries = readManifest(outDir).entries;
+    const targetEntry = manifestEntries[0]!;
+    const preExisting = {
+      caseId: targetEntry.caseId,
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "previous-run",
+      inputDigest: "stale-digest-from-a-different-input",
+      latencyMs: 1,
+      timestamp: new Date().toISOString(),
+      status: "ok" as const,
+      actual: "from-a-stale-run",
+    };
+    writeFileSync(path.join(outDir, "observations.jsonl"), `${JSON.stringify(preExisting)}\n`);
+
+    const calls: unknown[] = [];
+    const judge: Judge<CaseInput, string> = {
+      id: "counting",
+      evaluate(input) {
+        calls.push(input);
+        return "re-evaluated";
+      },
+    };
+
+    const summary = await evaluate(outDir, judge, { resume: true });
+    expect(summary.staleObservationsInvalidated).toBe(1);
+    expect(summary.skippedResumedSamples).toBe(0);
+    expect(summary.ranSamples).toBe(2); // the stale one, plus the second case's missing sample
+    expect(calls).toHaveLength(2);
+
+    const { observations } = readObservations(outDir);
+    // The stale line is superseded by the freshly appended one for the same (caseId, sampleIndex).
+    const forTargetCase = observations.find((o) => o.caseId === targetEntry.caseId)!;
+    expect(forTargetCase.actual).toBe("re-evaluated");
+  });
+});
+
+describe("evaluate/score: tolerant JSONL parsing", () => {
+  it("parseObservationsFile drops a torn trailing line (no closing newline) without error", () => {
+    const good = JSON.stringify({
+      caseId: "c1",
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "j",
+      inputDigest: "d",
+      latencyMs: 1,
+      timestamp: "t",
+      status: "ok",
+      actual: "x",
+    });
+    const torn = `${good}\n{"caseId":"c2","sampleIndex":0,"attempts":1,"judgeId":"j","incomplete`; // no trailing newline
+    const result = parseObservationsFile(torn, "test");
+    expect(result.tornTailDropped).toBe(true);
+    expect(result.observations).toHaveLength(1);
+    expect(result.observations[0]!.caseId).toBe("c1");
+  });
+
+  it("parseObservationsFile throws on a malformed line that is not a torn tail (mid-file corruption)", () => {
+    const good = JSON.stringify({
+      caseId: "c1",
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "j",
+      inputDigest: "d",
+      latencyMs: 1,
+      timestamp: "t",
+      status: "ok",
+      actual: "x",
+    });
+    const corruptedThenGood = `not valid json at all\n${good}\n`; // corrupted line is NOT last
+    expect(() => parseObservationsFile(corruptedThenGood, "test")).toThrow(AcyclicEvalError);
+    expect(() => parseObservationsFile(corruptedThenGood, "test")).toThrow(/malformed observation/);
+  });
+
+  it("parseObservationsFile throws on a malformed last line that DOES have a trailing newline (not a torn write)", () => {
+    const corruptedButTerminated = "this is not json\n";
+    expect(() => parseObservationsFile(corruptedButTerminated, "test")).toThrow(/malformed observation/);
+  });
+
+  it("evaluate() resume tolerates and repairs a torn trailing observation, re-running that sample", async () => {
+    const manifestEntries = readManifest(outDir).entries;
+    const [entryA, entryB] = manifestEntries;
+    const goodObs = JSON.stringify({
+      caseId: entryA!.caseId,
+      sampleIndex: 0,
+      attempts: 1,
+      judgeId: "previous-run",
+      inputDigest: realInputDigest(outDir, entryA!),
+      latencyMs: 1,
+      timestamp: new Date().toISOString(),
+      status: "ok",
+      actual: "kept-from-before",
+    });
+    // Simulate a process killed mid-append while writing case B's observation: a syntactically
+    // incomplete line with no trailing newline.
+    const tornLine = `{"caseId":"${entryB!.caseId}","sampleIndex":0,"attempts":1,"judgeId":"pr`;
+    writeFileSync(path.join(outDir, "observations.jsonl"), `${goodObs}\n${tornLine}`);
+
+    const calls: string[] = [];
+    const judge: Judge<CaseInput, string> = {
+      id: "counting",
+      evaluate(input) {
+        calls.push(JSON.stringify(input));
+        return "recovered";
+      },
+    };
+
+    const summary = await evaluate(outDir, judge, { resume: true });
+    expect(summary.skippedResumedSamples).toBe(1); // entryA's complete observation
+    expect(summary.ranSamples).toBe(1); // entryB's torn observation is treated as never-recorded
+    expect(calls).toHaveLength(1);
+
+    const { observations } = readObservations(outDir);
+    expect(observations).toHaveLength(2);
+    expect(observations.find((o) => o.caseId === entryA!.caseId)!.actual).toBe("kept-from-before");
+    expect(observations.find((o) => o.caseId === entryB!.caseId)!.actual).toBe("recovered");
+  });
+
+  it("evaluate() resume throws on non-tail corruption instead of silently mis-resuming", async () => {
+    writeFileSync(path.join(outDir, "observations.jsonl"), "corrupted garbage, not json\nmore garbage\n");
+    const judge: Judge<CaseInput, string> = { id: "unused", evaluate: () => "n/a" };
+    await expect(evaluate(outDir, judge, { resume: true })).rejects.toThrow(AcyclicEvalError);
   });
 });
 
@@ -206,6 +340,6 @@ describe("evaluate: append-based checkpointing", () => {
     await evaluate(outDir, judge, { concurrency: 1 });
     // Simulate a manual append (as a crashed-and-resumed process would leave behind).
     appendFileSync(path.join(outDir, "observations.jsonl"), "");
-    expect(readObservations(outDir)).toHaveLength(2);
+    expect(readObservations(outDir).observations).toHaveLength(2);
   });
 });
