@@ -89,8 +89,14 @@ export interface MutationOperator<TSource, TCaseInput, TExpected> {
    * to `material.source`, target present, ...). Must not compare against a
    * Judge's verdict -- doing so would silently exclude the very mutants that
    * would expose a buggy Judge.
+   *
+   * May return a Promise: a structural self-check sometimes has to re-parse
+   * the mutated content through the same (async) parser the domain's real
+   * pipeline uses, to confirm the mutation actually produced something
+   * parseable and that the target claim/anchor is still extractable at the
+   * expected location. `generate()` awaits this either way.
    */
-  selfValidate(material: Material<TSource>, candidate: MutantCandidate<TCaseInput, TExpected>): ValidationResult;
+  selfValidate(material: Material<TSource>, candidate: MutantCandidate<TCaseInput, TExpected>): ValidationResult | Promise<ValidationResult>;
 }
 
 export interface JudgeContext {
@@ -207,11 +213,13 @@ export interface EvaluateSummary {
   readonly ranSamples: number;
   readonly skippedResumedSamples: number;
   /**
-   * Samples that had a prior recorded observation but were re-run anyway
-   * because the case's artifact hashes differently now than when that
-   * observation was recorded (e.g. the artifact was regenerated or
-   * modified between evaluate() runs). These are included in `ranSamples`,
-   * not `skippedResumedSamples`.
+   * Samples that had a prior recorded observation but were re-run anyway,
+   * because either (a) the case's artifact hashes differently now than when
+   * that observation was recorded (e.g. regenerated or modified between
+   * evaluate() runs), or (b) the observation was recorded by a different
+   * judge identity (`judgeId`/`judgeVersion`) than the one evaluate() is
+   * running now. These are included in `ranSamples`, not
+   * `skippedResumedSamples`.
    */
   readonly staleObservationsInvalidated: number;
   readonly okSamples: number;
@@ -288,6 +296,17 @@ export interface ScoreOptions<TExpected, TActual> {
    */
   readonly minCoverage?: number;
   readonly minPassRate?: number;
+  /**
+   * Opt-in per-operator gate. When set (an empty array counts as set), any
+   * operator whose `structurallyValid` count is 0 and whose `operatorId` is
+   * NOT in this list fails the gate (`report.pass = false`) -- regardless of
+   * `minCoverage`'s aggregate ratio. This exists because an aggregate ratio
+   * can average away a single consistently-zero operator that a corpus
+   * simply never happens to exercise (e.g. a fail-then-retry pattern that
+   * doesn't occur in a given corpus): list that operator explicitly rather
+   * than silently tolerating *any* zero-coverage operator.
+   */
+  readonly allowZeroGenerated?: readonly string[];
 }
 
 /**
