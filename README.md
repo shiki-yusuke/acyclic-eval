@@ -3,7 +3,7 @@
 A mutation-based evaluation framework for measuring a judge's (LLM- or
 rule-based) accuracy without depending on the judge itself.
 
-> **Status: `0.1.0` (stable, on npm as `acyclic-eval`).** Phase 1 (framework + a self-contained toy
+> **Status: available on npm as `acyclic-eval`.** Phase 1 (framework + a self-contained toy
 > example) plus Phase 2 (a real-world adapter -- [evigate](https://github.com/shiki-yusuke/evigate)'s
 > mutation harness now runs on this framework, verified via a case-for-case
 > shadow-run comparison against its pre-adapter implementation; see
@@ -43,7 +43,7 @@ judge again.
 Install from npm, or run the example from a local checkout:
 
 ```bash
-npm install acyclic-eval        # library / CLI (0.1.0)
+npm install acyclic-eval
 
 # or, to run the bundled toy example end to end:
 git clone https://github.com/shiki-yusuke/acyclic-eval.git
@@ -184,7 +184,7 @@ result above is the real one.
   `0.1.0-alpha.2`'s API changes (async `selfValidate`, judge-identity-aware
   resume, `allowZeroGenerated`, manifest reader defenses) were driven by
   that adapter's real requirements -- see [CHANGELOG.md](./CHANGELOG.md).
-- **Released:** `0.1.0` is on npm as `acyclic-eval`, and evigate's adapter
+- **Released:** available on npm as `acyclic-eval`, and evigate's adapter
   is merged and live on its `main` branch.
 - Beyond that: additional example domains beyond the toy corpus (the toy's
   9/9 is a demonstration, not a real-world result -- the real-world
@@ -217,7 +217,7 @@ MIT — see [LICENSE](./LICENSE).
 toy ドメイン（簡易ルールベース判定器 + 3種のオペレータ）が generate → evaluate →
 score まで一気通貫で動作し、Markdown レポートが出力されます。
 
-現時点は安定版 `0.1.0` 系として npm に公開済みです（`npm install acyclic-eval`）。
+現時点は npm で `acyclic-eval` として公開済みです（`npm install acyclic-eval`）。
 Phase 1（フレームワーク本体 + toy example）と Phase 2（evigate adapter）が完了しています。
 README 中の「113/113」は、当初は本プロジェクトの設計源流と
 なった **[evigate](https://github.com/shiki-yusuke/evigate) 自身の**実績でしたが、

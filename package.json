@@ -11,7 +11,7 @@
     "cli"
   ],
   "license": "MIT",
-  "author": "shiki-yusuke",
+  "author": "Yusuke Shiki",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shiki-yusuke/acyclic-eval.git"
