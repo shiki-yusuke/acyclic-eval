@@ -179,9 +179,20 @@ async function main(): Promise<void> {
 // npm creates node_modules/.bin/acyclic-eval as a symlink. Resolve both paths
 // before comparing so the installed package's bin actually executes, while an
 // import from tests or a library consumer remains side-effect free.
-const isMain =
-  process.argv[1] !== undefined &&
-  realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+function canonicalPath(candidate: string): string | undefined {
+  try {
+    return realpathSync(path.resolve(candidate));
+  } catch {
+    // argv[1] can name something unresolvable (a virtual entry point from a
+    // bundler, a script deleted while running). Importing this module as a
+    // library must stay side-effect free rather than throwing here.
+    return undefined;
+  }
+}
+
+const entryPath = process.argv[1] === undefined ? undefined : canonicalPath(process.argv[1]);
+const modulePath = canonicalPath(fileURLToPath(import.meta.url));
+const isMain = entryPath !== undefined && modulePath !== undefined && entryPath === modulePath;
 if (isMain) {
   main().catch((err) => {
     console.error(err instanceof Error ? err.message : String(err));

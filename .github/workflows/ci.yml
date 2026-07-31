@@ -44,9 +44,12 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Pack candidate
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/acyclic-eval-package"
-          npm pack --pack-destination "$RUNNER_TEMP/acyclic-eval-package"
+          TARBALL_NAME="$(npm pack --pack-destination "$RUNNER_TEMP/acyclic-eval-package" --json | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8"))[0].filename')"
+          echo "TARBALL_PATH=$RUNNER_TEMP/acyclic-eval-package/$TARBALL_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: "18"
@@ -58,7 +61,7 @@ jobs:
           mkdir -p "$SMOKE_DIR"
           cd "$SMOKE_DIR"
           npm init -y
-          npm install --ignore-scripts --no-audit --no-fund "$RUNNER_TEMP/acyclic-eval-package/acyclic-eval-0.1.4.tgz"
+          npm install --ignore-scripts --no-audit --no-fund "$TARBALL_PATH"
           npx --no-install acyclic-eval --help
           node --input-type=module -e 'const api = await import("acyclic-eval"); if ([api.generate, api.evaluate, api.score].some((value) => typeof value !== "function")) process.exit(1); console.log("library import: function function function");'
           npx --no-install acyclic-eval generate --config node_modules/acyclic-eval/dist/examples/toy/config.js --out ./out
