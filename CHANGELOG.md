@@ -1,8 +1,32 @@
 # Changelog
 
 All notable changes to acyclic-eval are documented here. This project is
-pre-1.0 (alpha); breaking changes between alpha releases are expected and
-are not accompanied by a deprecation period.
+pre-1.0; breaking changes between minor releases may occur without a
+deprecation period.
+
+## 0.1.4
+
+### Fixed
+
+- Fixed the CLI entrypoint so the `acyclic-eval` command runs correctly when
+  invoked through npm's generated bin symlink, including normal `npx acyclic-eval` usage.
+
+### Added
+
+- Added package-level fresh-install verification covering direct CLI, npm bin,
+  library import, and the published-package execution path.
+
+### Documentation and maintenance
+
+- Reworked the quick start around generate → evaluate → score, separated the
+  Japanese README, and added examples, threat-model guidance, release
+  documentation, and contribution guidelines.
+- Added guarded CI and Trusted Publishing workflow checks without performing a
+  publish.
+
+## 0.1.3
+
+Release metadata update. No API change is documented for this release.
 
 ## 0.1.2
 

@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem with acyclic-eval.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, raw prompts, transcripts, observations.jsonl, local paths, or production logs. Use a redacted synthetic fixture.
+  - type: input
+    id: version
+    attributes:
+      label: acyclic-eval version or commit
+      placeholder: 0.1.3
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Node.js and npm versions
+      placeholder: node v22.x, npm 11.x
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Linux, Windows, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Sanitized command and minimal reproduction
+      description: Use synthetic corpus data and redact paths or credentials.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

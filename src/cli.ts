@@ -14,6 +14,7 @@
 // `evaluateConfig()` would have imported to build a Judge.
 
 import path from "node:path";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { AcyclicEvalError } from "./errors.js";
 import { evaluate } from "./evaluate.js";
@@ -120,6 +121,11 @@ async function main(): Promise<void> {
   const flags = parseFlags(rest);
   const outDir = flags.out ?? ".acyclic-eval-out";
 
+  if (command === "--help" || command === "-h" || flags.help === "true") {
+    printUsage();
+    return;
+  }
+
   if (command === undefined || flags.config === undefined) {
     printUsage();
     process.exitCode = 1;
@@ -170,7 +176,23 @@ async function main(): Promise<void> {
 }
 
 // Only run as a CLI entry point, not when imported by tests for loadGenerateConfig etc.
-const isMain = process.argv[1] !== undefined && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// npm creates node_modules/.bin/acyclic-eval as a symlink. Resolve both paths
+// before comparing so the installed package's bin actually executes, while an
+// import from tests or a library consumer remains side-effect free.
+function canonicalPath(candidate: string): string | undefined {
+  try {
+    return realpathSync(path.resolve(candidate));
+  } catch {
+    // argv[1] can name something unresolvable (a virtual entry point from a
+    // bundler, a script deleted while running). Importing this module as a
+    // library must stay side-effect free rather than throwing here.
+    return undefined;
+  }
+}
+
+const entryPath = process.argv[1] === undefined ? undefined : canonicalPath(process.argv[1]);
+const modulePath = canonicalPath(fileURLToPath(import.meta.url));
+const isMain = entryPath !== undefined && modulePath !== undefined && entryPath === modulePath;
 if (isMain) {
   main().catch((err) => {
     console.error(err instanceof Error ? err.message : String(err));
