@@ -4,6 +4,12 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0 (alpha); breaking changes between alpha releases are expected and
 are not accompanied by a deprecation period.
 
+## 0.1.1
+
+Docs-only release: the README bundled with 0.1.0 predated the npm release
+itself and still carried pre-release wording ("not yet published to npm",
+"adapter branch not yet pushed"). No code changes.
+
 ## 0.1.0
 
 Same API as 0.1.0-alpha.2, promoted to stable. Between alpha.2 and this release the framework
