@@ -181,9 +181,11 @@ result above is the real one.
   `0.1.0-alpha.2`'s API changes (async `selfValidate`, judge-identity-aware
   resume, `allowZeroGenerated`, manifest reader defenses) were driven by
   that adapter's real requirements -- see [CHANGELOG.md](./CHANGELOG.md).
-- Beyond that: additional example domains, a `next`-tagged npm prerelease
-  once the API stabilizes past alpha, and (pending a separate release
-  decision) publishing this package and pushing evigate's adapter branch.
+- **Released:** `0.1.0` is on npm as `acyclic-eval`, and evigate's adapter
+  is merged and live on its `main` branch.
+- Beyond that: additional example domains beyond the toy corpus (the toy's
+  9/9 is a demonstration, not a real-world result -- the real-world
+  validation is the evigate 113/113 above).
 
 ## License
 
