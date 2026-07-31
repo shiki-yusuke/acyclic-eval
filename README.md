@@ -9,8 +9,8 @@ rule-based) accuracy without depending on the judge itself.
 > shadow-run comparison against its pre-adapter implementation; see
 > [CHANGELOG.md](./CHANGELOG.md) for the API changes that adapter needed:
 > async `selfValidate`, judge-identity-aware resume, a per-operator gate,
-> manifest reader defenses). Not yet published to npm; evigate's adapter
-> branch is not yet pushed. API may change before a stable release.
+> manifest reader defenses). evigate's adapter is merged and live on its
+> `main` branch.
 
 ## Why acyclic?
 
@@ -40,9 +40,12 @@ judge again.
 
 ## Quick start
 
-Not yet published to npm — install from a local checkout:
+Install from npm, or run the example from a local checkout:
 
 ```bash
+npm install acyclic-eval        # library / CLI (0.1.0)
+
+# or, to run the bundled toy example end to end:
 git clone https://github.com/shiki-yusuke/acyclic-eval.git
 cd acyclic-eval
 npm install
