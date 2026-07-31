@@ -3,7 +3,7 @@
 A mutation-based evaluation framework for measuring a judge's (LLM- or
 rule-based) accuracy without depending on the judge itself.
 
-> **Status: `0.1.0-alpha.2`.** Phase 1 (framework + a self-contained toy
+> **Status: `0.1.0` (stable, on npm as `acyclic-eval`).** Phase 1 (framework + a self-contained toy
 > example) plus Phase 2 (a real-world adapter -- [evigate](https://github.com/shiki-yusuke/evigate)'s
 > mutation harness now runs on this framework, verified via a case-for-case
 > shadow-run comparison against its pre-adapter implementation; see
