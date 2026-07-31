@@ -46,8 +46,15 @@ calling the Judge again.
 
 ## Quick start
 
-Requires Node.js 18 or later. The current checkout is the immediately runnable
-path while the next npm release is prepared:
+Requires Node.js 18 or later. The npm package is the recommended way to try
+acyclic-eval:
+
+```bash
+npm install acyclic-eval
+npx acyclic-eval --help
+```
+
+For maintainers working from source:
 
 ```bash
 git clone https://github.com/shiki-yusuke/acyclic-eval.git
@@ -60,13 +67,10 @@ npm run demo
 self-contained rule-based transcript Judge with three mutation operators and
 needs no credentials or network after `npm ci`.
 
-### Packaged quick start (next npm release)
+### Packaged quick start
 
-The following sequence is verified against the freshly packed tarball from
-this checkout. At verification time, the public `latest` package was `0.1.3`
-and its npm-bin symlink entrypoint did not execute; the fix is in this checkout
-but has not been published. Do not present this as a current registry command
-until a newer version has been released.
+The following sequence is verified against `acyclic-eval@0.1.4` installed from
+the npm registry:
 
 ```bash
 npm install acyclic-eval

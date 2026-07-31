@@ -36,8 +36,14 @@ corpus + MutationOperator ──generate──> manifest + artifacts
 
 ## Quick start
 
-Node.js 18 以降が必要です。次の npm release を準備中のため、現時点で直ちに
-再現できる導線は source checkout です。
+Node.js 18 以降が必要です。まず npm パッケージをインストールして試せます。
+
+```bash
+npm install acyclic-eval
+npx acyclic-eval --help
+```
+
+メンテナーが source checkout から作業する場合は、次を実行します。
 
 ```bash
 git clone https://github.com/shiki-yusuke/acyclic-eval.git
@@ -50,12 +56,9 @@ npm run demo
 持つ自己完結のルールベース transcript Judge を実行し、`npm ci` 後は資格情報も
 ネットワークも必要としません。
 
-### パッケージ版 Quick start（次の npm release 向け）
+### パッケージ版 Quick start
 
-次の手順は、この checkout から作った tarball で検証済みです。検証時点の公開済み
-`latest` は `0.1.3` で、npm bin の symlink 経由でCLIが実行されない不具合がありました。
-修正はこの checkout にありますが、まだ公開していません。新しい version を公開する
-までは、次を現在の registry 導線として案内しないでください。
+次の手順は npm registry の `acyclic-eval@0.1.4` からインストールして検証済みです。
 
 ```bash
 npm install acyclic-eval
