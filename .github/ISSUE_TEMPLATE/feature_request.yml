@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a focused improvement to the framework or documentation.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include private corpora, secrets, or raw agent transcripts.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the evaluation or integration problem, not only a preferred API.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Explain how generation, Judge, and Comparator independence would be preserved.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

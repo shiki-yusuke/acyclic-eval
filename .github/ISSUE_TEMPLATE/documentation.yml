@@ -1,0 +1,25 @@
+name: Documentation issue
+description: Report an unclear, outdated, or missing documentation path.
+title: "docs: "
+labels: [documentation]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation location
+      placeholder: README Quick start, docs/threat-model.md, or a URL
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is unclear or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Suggested improvement
+  - type: markdown
+    attributes:
+      value: Do not paste credentials, raw prompts, transcripts, local paths, or production logs.

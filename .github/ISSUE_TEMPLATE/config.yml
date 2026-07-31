@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/shiki-yusuke/acyclic-eval/security/advisories/new
+    about: Report sensitive vulnerabilities privately; do not include secrets or raw logs in an issue.

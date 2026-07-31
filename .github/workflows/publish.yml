@@ -1,0 +1,55 @@
+name: Publish package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Type true only after completing the manual release checklist.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && inputs.publish == true
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@^11.5.1
+      - run: npm --version
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run check:docs
+      - run: npm run verify:package
+      - name: Verify clean tree and unpublished version
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          set +e
+          NPM_VIEW_OUTPUT="$(npm view "acyclic-eval@${PACKAGE_VERSION}" version --json 2>&1)"
+          NPM_VIEW_STATUS=$?
+          set -e
+          if [ "$NPM_VIEW_STATUS" -eq 0 ]; then
+            echo "acyclic-eval@${PACKAGE_VERSION} already exists on npm: ${NPM_VIEW_OUTPUT}"
+            exit 1
+          fi
+          case "$NPM_VIEW_OUTPUT" in
+            *E404*) ;;
+            *) echo "$NPM_VIEW_OUTPUT"; echo "Could not prove that the version is unpublished."; exit 1 ;;
+          esac
+      - run: npm publish --provenance
