@@ -25,6 +25,6 @@ npm run demo
    remain part of the result.”
 
 For a local recording, `npm run demo` cleans up its temporary output; do not
-record real prompts, transcripts, user names, or local file paths. The npm
-package sequence is verified for the next release candidate, but public `0.1.3`
-predates the npm-bin symlink fix and should not be used for the recording.
+record real prompts, transcripts, user names, or local file paths. The published
+`0.1.4` package has also been verified through the npm bin path and the packaged
+generate → evaluate → score sequence.

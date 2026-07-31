@@ -17,6 +17,6 @@ npm run build
 The script creates and removes its own temporary directory. It does not change
 your corpus, credentials, or existing evaluation output.
 
-The public `0.1.3` package predates the npm-bin symlink fix in this checkout.
-Use the source quickstart until a newer package version is published, then
-re-run `npm run verify:package` against the release candidate.
+The published `0.1.4` package includes the npm-bin symlink fix. After a release,
+re-run the registry verification commands from
+`docs/oss-growth/POST-PUBLISH-VERIFICATION.md` when validating a new version.
