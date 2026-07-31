@@ -3,6 +3,13 @@
 A mutation-based evaluation framework for measuring a judge's (LLM- or
 rule-based) accuracy without depending on the judge itself.
 
+`acyclic-eval` is not a ready-made evaluator. It is a framework for testing
+your own Judge by generating domain-specific mutated cases with structurally
+known expectations.
+
+`acyclic-eval` は完成済みの汎用評価器ではありません。利用者が作ったJudge・分類器・検出器を、
+既知の期待結果を持つmutation caseによって評価するためのフレームワークです。
+
 > **Status: available on npm as `acyclic-eval`.** Phase 1 (framework + a self-contained toy
 > example) plus Phase 2 (a real-world adapter -- [evigate](https://github.com/shiki-yusuke/evigate)'s
 > mutation harness now runs on this framework, verified via a case-for-case
