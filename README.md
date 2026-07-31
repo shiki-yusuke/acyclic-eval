@@ -217,11 +217,12 @@ MIT — see [LICENSE](./LICENSE).
 toy ドメイン（簡易ルールベース判定器 + 3種のオペレータ）が generate → evaluate →
 score まで一気通貫で動作し、Markdown レポートが出力されます。
 
-現時点は Phase 1（フレームワーク本体 + toy example）+ Phase 2（evigate adapter）が完了した
-npm 未公開のアルファ版です。README 中の「113/113」は、当初は本プロジェクトの設計源流と
+現時点は安定版 `0.1.0` 系として npm に公開済みです（`npm install acyclic-eval`）。
+Phase 1（フレームワーク本体 + toy example）と Phase 2（evigate adapter）が完了しています。
+README 中の「113/113」は、当初は本プロジェクトの設計源流と
 なった **[evigate](https://github.com/shiki-yusuke/evigate) 自身の**実績でしたが、
 Phase 2 で evigate の mutation harness（`src/eval-adapters/`）自体を `acyclic-eval` の
 adapter として繋ぎ込んだことで、**現在は `acyclic-eval` 自身が生成する結果**になりました
 （旧実装は、その adapter とのケース単位 shadow-run 比較が一致することを確認したうえで
-削除済み）。`acyclic-eval` 自身の toy example は 9/9 で、これは実績値ではなく
-デモンストレーション用のコーパスです。evigate の adapter ブランチはまだ push していません。
+削除済み。adapter は evigate の main ブランチに反映・公開済みです）。`acyclic-eval` 自身の
+toy example は 9/9 で、これは実績値ではなくデモンストレーション用のコーパスです。

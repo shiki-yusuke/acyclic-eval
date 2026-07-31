@@ -4,6 +4,12 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0 (alpha); breaking changes between alpha releases are expected and
 are not accompanied by a deprecation period.
 
+## 0.1.2
+
+Docs-only release: 0.1.1 fixed the English pre-release wording but missed the
+same stale statements in the Japanese summary section (「npm 未公開」,
+「adapter ブランチはまだ push していません」). No code changes.
+
 ## 0.1.1
 
 Docs-only release: the README bundled with 0.1.0 predated the npm release
