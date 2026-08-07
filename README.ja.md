@@ -117,7 +117,7 @@ Issue やPRには、未加工の transcript、prompt、コマンド出力、資�
   完了申告を実行証拠と照合します。
 - [**agent-cost**](https://github.com/shiki-yusuke/agent-cost) — Claude Code と
   Codex CLI の token 使用量と推定コストを可視化します。
-- [**spec-lane**](https://github.com/shiki-yusuke/lane) — Intent から検証・人間の
+- [**spec-lane**](https://github.com/shiki-yusuke/spec-lane) — Intent から検証・人間の
   判断ゲートまでを管理します。
 
 各ツールは独立して利用できます。組み合わせる場合は、コスト計測、申告検証、

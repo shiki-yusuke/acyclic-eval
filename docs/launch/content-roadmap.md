@@ -9,7 +9,7 @@ announcement. Link only to the tool that genuinely helps the reader next.
 | 1 | Claude Code / Codex CLIのトークン使用量をローカルログから測る | [agent-cost](https://github.com/shiki-yusuke/agent-cost) | Separate observed usage from estimated cost. |
 | 2 | AIエージェントの「テスト成功」を信用せず、実行証拠と照合する | [evigate](https://github.com/shiki-yusuke/evigate) | Compare completion claims with commands, tests, and edits. |
 | 3 | LLM Judgeの評価にJudge自身を使うと何が起きるか | [acyclic-eval](https://github.com/shiki-yusuke/acyclic-eval) | Recognize circular case selection and three-role separation. |
-| 4 | AI開発フローにHuman Gateを残す理由 | [spec-lane](https://github.com/shiki-yusuke/lane) | Identify decisions that should remain reviewable. |
+| 4 | AI開発フローにHuman Gateを残す理由 | [spec-lane](https://github.com/shiki-yusuke/spec-lane) | Identify decisions that should remain reviewable. |
 | 5 | 仕様書をAIが読める形でコード・テスト・ログへ接続する | [spec-impact-analyzer](https://github.com/shiki-yusuke/spec-impact-analyzer) | Use a case study to reason about specification impact. |
 | 6 | AI支援開発のコスト推定を実績でcalibrationする | [agent-cost](https://github.com/shiki-yusuke/agent-cost) | Explain estimate uncertainty and later calibration. |
 | 7 | unknownを無理に成功・失敗へ分類しない設計 | [acyclic-eval](https://github.com/shiki-yusuke/acyclic-eval) | Preserve uncertainty and route it to human review. |

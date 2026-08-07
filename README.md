@@ -169,7 +169,7 @@ undermine an evaluation. See [limitations](./docs/limitations.md).
   is the documented real-world integration of acyclic-eval.
 - [**agent-cost**](https://github.com/shiki-yusuke/agent-cost) — measures
   Claude Code and Codex CLI token usage and estimated cost.
-- [**spec-lane**](https://github.com/shiki-yusuke/lane) — controls intent,
+- [**spec-lane**](https://github.com/shiki-yusuke/spec-lane) — controls intent,
   specification, verification, and human decision gates in delivery work.
 - [**ai-agent-skills-playbook**](https://github.com/shiki-yusuke/ai-agent-skills-playbook)
   — reusable workflows and guardrails for AI-assisted development.
