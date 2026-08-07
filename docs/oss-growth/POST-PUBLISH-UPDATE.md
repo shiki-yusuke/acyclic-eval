@@ -1,8 +1,11 @@
 # Post-publish README update — acyclic-eval 0.1.4
 
-This checklist is intentionally not performed before publication.
+This checklist was intentionally not performed before publication. It was
+completed after the `0.1.4` registry verification passed (see
+[POST-PUBLISH-RESULT-0.1.4.md](./POST-PUBLISH-RESULT-0.1.4.md)); the items
+below are kept as a record, not open work.
 
-## Remove after registry verification
+## Remove after registry verification (done)
 
 - Remove the README sentence explaining that public `0.1.3` predates the npm
   bin symlink fix.
