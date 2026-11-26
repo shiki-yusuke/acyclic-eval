@@ -15,7 +15,7 @@
 
 import path from "node:path";
 import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { AcyclicEvalError } from "./errors.js";
 import { evaluate } from "./evaluate.js";
 import { generate } from "./generate.js";
@@ -31,7 +31,7 @@ type AnyScoreConfig = ScoreConfig<any, any>;
 
 async function importConfigModule(configPath: string): Promise<Record<string, unknown>> {
   const resolved = path.resolve(configPath);
-  return (await import(resolved)) as Record<string, unknown>;
+  return (await import(pathToFileURL(resolved).href)) as Record<string, unknown>;
 }
 
 export async function loadGenerateConfig(configPath: string): Promise<AnyGenerateConfig> {

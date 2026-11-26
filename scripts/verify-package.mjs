@@ -8,7 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sandbox = mkdtempSync(path.join(tmpdir(), "acyclic-eval-package-"));
 const cache = path.join(sandbox, "npm-cache");
 const packDirectory = path.join(sandbox, "pack");
-const consumer = path.join(sandbox, "consumer");
+// A native ESM import must treat the consumer directory as a filesystem path.
+const consumer = path.join(sandbox, "consumer #1 100%");
 const output = path.join(consumer, "out");
 const env = { ...process.env, npm_config_cache: cache, npm_config_audit: "false", npm_config_fund: "false" };
 
