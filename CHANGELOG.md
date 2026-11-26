@@ -4,6 +4,17 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0; breaking changes between minor releases may occur without a
 deprecation period.
 
+## 0.2.1
+
+- For each case with a failed comparison, `score()` reports the actual value
+  and comparator detail from the failing sample with the lowest zero-based
+  `sampleIndex`. A later passing sample could previously appear in that slot.
+- JSON and Markdown mismatch records now include the sample index. Existing
+  report JSON can still be rendered. Refresh snapshots that include changed
+  mismatch records.
+- Dependabot checks npm and GitHub Actions weekly and groups minor and patch
+  updates within each ecosystem.
+
 ## 0.2.0
 
 ### Migration
