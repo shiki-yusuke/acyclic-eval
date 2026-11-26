@@ -5,7 +5,15 @@ import { sha256Hex } from "./digest.js";
 import { AcyclicEvalError } from "./errors.js";
 import { resolveOutputPath } from "./output-path.js";
 
-export { resolveOutputPath as resolveArtifactPath };
+/** Validate the target and preserve the absolute spelling of the caller's path. */
+export function resolveArtifactPath(outDir: string, artifactUri: string): string {
+  try {
+    resolveOutputPath(outDir, artifactUri);
+  } catch (error) {
+    throw new AcyclicEvalError(`invalid manifest artifactUri "${artifactUri}": ${(error as Error).message}`);
+  }
+  return path.resolve(outDir, artifactUri);
+}
 
 const MANIFEST_FILE = "manifest.json";
 const ARTIFACT_DIR = "artifacts";
@@ -93,7 +101,7 @@ function assertManifestEntry(v: unknown, index: number, outDir: string): Manifes
     throw new AcyclicEvalError(`manifest entry #${index} has a non-string "artifactUri" field`);
   }
   // Fail fast at load time, not only when something later happens to call readArtifact().
-  resolveOutputPath(outDir, v.artifactUri);
+  resolveArtifactPath(outDir, v.artifactUri);
   return v as unknown as ManifestEntry;
 }
 
