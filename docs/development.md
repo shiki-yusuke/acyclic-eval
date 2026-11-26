@@ -2,9 +2,10 @@
 
 ## Requirements
 
-Node.js 18 or later and npm are required. CI exercises supported runtime
-versions separately; use the version declared in `package.json` as the
-compatibility contract.
+Use the latest patch of Node.js 22, 24, or 26 LTS and its bundled npm. CI
+runs the development checks on these three lines. The published CLI and
+library also support Node.js 18, which CI exercises by installing the
+tarball in a separate runtime smoke test.
 
 ## Setup and checks
 

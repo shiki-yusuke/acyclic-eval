@@ -16,11 +16,10 @@ npm run verify:package
 npm pack --dry-run
 ```
 
-The public `0.1.3` package already exists and predates this checkout's npm-bin
-symlink fix. Bump to a new, intentional version before publishing. After the
-release, install that exact registry version in a new temporary directory and
-run the packaged quickstart again; a locally packed tarball is necessary but
-not sufficient evidence of a successful registry release.
+Check the current registry version with `npm view acyclic-eval version` and
+choose an unused version for the release. Update the package manifest and
+lockfile together. After publishing, install the exact registry version in a
+fresh temporary directory and run the packaged quickstart.
 
 Review the tarball file list for generated artifacts, source maps, secrets,
 transcripts, local databases, coverage, private corpora, and internal-only
@@ -29,9 +28,8 @@ documentation. Confirm that `repository.url` still points to
 
 ## npm Trusted Publishing setup (manual)
 
-The repository includes a **manual and guarded** workflow proposal at
-`.github/workflows/publish.yml`. Before a maintainer can use it, configure npm
-manually:
+The release workflow lives at `.github/workflows/publish.yml`. To configure
+or verify its npm Trusted Publisher, use these settings:
 
 1. Open the `acyclic-eval` package settings on npm.
 2. Add a Trusted Publisher for GitHub Actions.
@@ -43,9 +41,10 @@ manually:
 6. After a successful provenance-verified release, revoke any superseded
    long-lived npm automation token.
 
-The workflow uses a GitHub-hosted runner, Node.js 22.14 or later, npm 11.5.1
-or later, `id-token: write`, and `npm publish --provenance`. It remains inert
-unless a maintainer manually dispatches it with an explicit confirmation.
+The workflow selects the latest Node.js 24.x patch on a GitHub-hosted
+runner and uses its bundled npm for Trusted Publishing (npm 11.5.1 or
+later). The maintainer dispatches the workflow on main with the publish
+input enabled. The job uses `id-token: write` and `npm publish --provenance`.
 
 Create the GitHub Release and publish to npm only after the manual actions and
 all checks are complete. Do not assume adding this file configured npm; it did

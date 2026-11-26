@@ -36,7 +36,8 @@ corpus + MutationOperator ──generate──> manifest + artifacts
 
 ## Quick start
 
-Node.js 18 以降が必要です。まず npm パッケージをインストールして試せます。
+npm パッケージは Node.js 18 以降で動作します。利用時は、サポート中の LTS
+（22・24・26 系）に最新のセキュリティ更新を適用してください。
 
 ```bash
 npm install acyclic-eval
