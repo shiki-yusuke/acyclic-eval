@@ -1,6 +1,6 @@
 {
   "name": "acyclic-eval",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Evaluate LLM and rule-based judges with mutation cases whose generation does not depend on the judge under test.",
   "keywords": [
     "llm-evaluation",

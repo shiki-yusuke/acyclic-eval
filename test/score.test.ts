@@ -4,8 +4,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { digestOfValue } from "../src/digest.js";
 import { AcyclicEvalError } from "../src/errors.js";
+import { readObservations } from "../src/evaluate.js";
 import { generate } from "../src/generate.js";
-import { readArtifact } from "../src/manifest.js";
+import { readArtifact, readManifest } from "../src/manifest.js";
+import { formatReport } from "../src/report.js";
 import { score } from "../src/score.js";
 import { expectEquals, expectForbid, expectOneOf } from "../src/types.js";
 import type {
@@ -123,6 +125,47 @@ describe("score: equals / oneOf / forbid", () => {
     const r2 = score(outDir, comparator);
     expect(r1.byOperator).toEqual(r2.byOperator);
     expect(r1.mismatches.map((m) => m.caseId)).toEqual(r2.mismatches.map((m) => m.caseId));
+  });
+
+  it.each([[0, 2, 0], [2, 0, 0], [4, 2, 2]])("for failures %i then %i, reports sample %i", (first, second, expectedIndex) => {
+    const entry = readManifest(outDir).entries.find((entry) => (entry.target as { id: string }).id === "eq-pass")!;
+    const base = readObservations(outDir).observations.find((obs) => obs.caseId === entry.caseId)!;
+    const failures = [first, second].map((sampleIndex) => ({ ...base, sampleIndex, actual: `wrong-${sampleIndex}` }));
+    const samples: Observation[] = [
+      ...failures,
+      { ...base, sampleIndex: 1, status: "infra_error", actual: undefined, error: "timeout" },
+      { ...base, sampleIndex: 3, actual: "X" },
+    ];
+    writeFileSync(path.join(outDir, "observations.jsonl"), samples.map((obs) => JSON.stringify(obs)).join("\n") + "\n");
+    const report = score<string, string>(outDir, {
+      ...comparator,
+      compare(expected, actual) {
+        return { ...comparator.compare(expected, actual), detail: `observed ${actual}` };
+      },
+    });
+
+    expect(report.overall).toMatchObject({ evaluated: 1, passed: 0 });
+    const saved = JSON.parse(readFileSync(path.join(outDir, "report.json"), "utf8"));
+    expect(saved.mismatches).toEqual([expect.objectContaining({
+      caseId: base.caseId,
+      sampleIndex: expectedIndex,
+      actual: `wrong-${expectedIndex}`,
+      detail: `observed wrong-${expectedIndex}`,
+      error: "timeout",
+    })]);
+    const markdown = readFileSync(path.join(outDir, "report.md"), "utf8");
+    expect(markdown).toContain(`- sample index (zero-based): ${expectedIndex}`);
+    expect(markdown).toContain(`- actual: \`"wrong-${expectedIndex}"\``);
+    expect(markdown).toContain(`- detail: observed wrong-${expectedIndex}`);
+    expect(markdown).toContain("- error: timeout");
+  });
+
+  it("renders saved mismatch records that predate sample indices", () => {
+    const report = score(outDir, comparator);
+    const legacy = JSON.stringify(report, (key, value) => key === "sampleIndex" ? undefined : value);
+    const { markdown } = formatReport(JSON.parse(legacy));
+    expect(markdown).toContain('- actual: `"Y"`');
+    expect(markdown).not.toContain("sample index");
   });
 });
 
