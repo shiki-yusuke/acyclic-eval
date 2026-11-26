@@ -26,6 +26,8 @@ the output directory private throughout each run.
 - Update the Vitest development dependencies and run CI on Node.js 22,
   24, and 26. The installed package also receives a Node.js 18 compatibility
   check. Trusted Publishing uses a patched Node.js 24 runtime.
+- Limit test discovery to the project's `test/` directory so local backup
+  copies are excluded from development runs.
 
 ## 0.1.4
 
