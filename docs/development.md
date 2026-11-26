@@ -7,6 +7,11 @@ runs the development checks on these three lines. The published CLI and
 library also support Node.js 18, which CI exercises by installing the
 tarball in a separate runtime smoke test.
 
+`npm run typecheck:node18` checks the core and shipped examples against the
+Node.js 18 API before that smoke test. It uses a separate npm alias for the
+Node.js 18 type definitions so newer development types cannot mask an
+unsupported API.
+
 ## Setup and checks
 
 Put test suites under `test/`. Both `npm test` and `npm run test:watch`

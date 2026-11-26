@@ -48,6 +48,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:node18": "tsc --noEmit -p tsconfig.build.json --typeRoots ./node_modules/@node18-compat --types node --skipLibCheck false",
     "test": "npm run typecheck && vitest run --dir test",
     "test:watch": "vitest --dir test",
     "example": "npm run build && node dist/examples/toy/run.js",
@@ -57,6 +58,7 @@
     "prepublishOnly": "npm run typecheck && npm run test && npm run build && npm run check:docs && npm run verify:package"
   },
   "devDependencies": {
+    "@node18-compat/node": "npm:@types/node@18.19.130",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
     "vitest": "4.1.12"
