@@ -61,6 +61,6 @@
     "@node18-compat/node": "npm:@types/node@18.19.130",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
-    "vitest": "4.1.12"
+    "vitest": "5.1.1"
   }
 }
