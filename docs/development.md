@@ -24,6 +24,10 @@ packs to a temporary directory, rejects unwanted package content, creates a
 fresh npm consumer, and executes the published-package quickstart against the
 tarball.
 
+The npm package includes the compiled core and the toy, rule-based judge,
+and LLM adapter examples. A new example is available from a source checkout
+until its compiled files are explicitly added to the package and verified.
+
 Use `npm pack --dry-run` for a quick file-list inspection. Do not publish from
 this command path; release preparation and npm Trusted Publishing setup are
 documented in [releasing.md](./releasing.md).
