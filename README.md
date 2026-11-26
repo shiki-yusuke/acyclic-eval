@@ -46,8 +46,8 @@ calling the Judge again.
 
 ## Quick start
 
-Requires Node.js 18 or later. The npm package is the recommended way to try
-acyclic-eval:
+The npm package runs on Node.js 18 or later. Use a supported LTS release
+(22, 24, or 26) with its latest security patches.
 
 ```bash
 npm install acyclic-eval

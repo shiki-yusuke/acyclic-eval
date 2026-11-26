@@ -1,8 +1,8 @@
 # Contributing to acyclic-eval
 
-Thanks for helping make judge evaluations more inspectable. This project is a
-Node.js package; the published runtime contract is Node.js 18 or later. CI
-exercises Node.js 20, 22, and 24.
+The published package runs on Node.js 18 or later. Use a patched Node.js
+22, 24, or 26 LTS release to develop and run tests. CI also checks the
+installed package on Node.js 18 for runtime compatibility.
 
 ## Setup
 
