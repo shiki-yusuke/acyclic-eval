@@ -6,7 +6,7 @@ import { digestOfValue } from "../src/digest.js";
 import { AcyclicEvalError } from "../src/errors.js";
 import { readObservations } from "../src/evaluate.js";
 import { generate } from "../src/generate.js";
-import { readArtifact } from "../src/manifest.js";
+import { readArtifact, readManifest } from "../src/manifest.js";
 import { formatReport } from "../src/report.js";
 import { score } from "../src/score.js";
 import { expectEquals, expectForbid, expectOneOf } from "../src/types.js";
@@ -128,7 +128,8 @@ describe("score: equals / oneOf / forbid", () => {
   });
 
   it.each([[0, 2, 0], [2, 0, 0], [4, 2, 2]])("for failures %i then %i, reports sample %i", (first, second, expectedIndex) => {
-    const base = readObservations(outDir).observations[0]!;
+    const entry = readManifest(outDir).entries.find((entry) => (entry.target as { id: string }).id === "eq-pass")!;
+    const base = readObservations(outDir).observations.find((obs) => obs.caseId === entry.caseId)!;
     const failures = [first, second].map((sampleIndex) => ({ ...base, sampleIndex, actual: `wrong-${sampleIndex}` }));
     const samples: Observation[] = [
       ...failures,
@@ -156,13 +157,13 @@ describe("score: equals / oneOf / forbid", () => {
     expect(markdown).toContain(`- sample index (zero-based): ${expectedIndex}`);
     expect(markdown).toContain(`- actual: \`"wrong-${expectedIndex}"\``);
     expect(markdown).toContain(`- detail: observed wrong-${expectedIndex}`);
-    expect(markdown).toContain("- case infrastructure error: timeout");
+    expect(markdown).toContain("- error: timeout");
   });
 
   it("renders saved mismatch records that predate sample indices", () => {
     const report = score(outDir, comparator);
-    const mismatches = report.mismatches.map(({ sampleIndex, ...legacy }) => legacy);
-    const { markdown } = formatReport({ ...report, mismatches });
+    const legacy = JSON.stringify(report, (key, value) => key === "sampleIndex" ? undefined : value);
+    const { markdown } = formatReport(JSON.parse(legacy));
     expect(markdown).toContain('- actual: `"Y"`');
     expect(markdown).not.toContain("sample index");
   });

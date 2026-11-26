@@ -59,7 +59,7 @@ export function formatReport(report: ScoreReport): { json: string; markdown: str
       if (m.sampleIndex !== undefined) lines.push(`- sample index (zero-based): ${m.sampleIndex}`);
       lines.push(`- expected: \`${JSON.stringify(m.expected)}\``);
       lines.push(`- actual: \`${m.actual === undefined ? "(none)" : JSON.stringify(m.actual)}\``);
-      if (m.error) lines.push(`- case infrastructure error: ${m.error}`);
+      if (m.error) lines.push(`- error: ${m.error}`);
       if (m.detail) lines.push(`- detail: ${m.detail}`);
       lines.push("");
     }
