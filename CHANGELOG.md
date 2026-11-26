@@ -4,6 +4,29 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0; breaking changes between minor releases may occur without a
 deprecation period.
 
+## 0.2.0
+
+### Migration
+
+Bundle files must resolve inside the output directory selected by the caller.
+Existing bundles that link to external files or have dangling links are rejected.
+Copy the linked file into the bundle or regenerate missing artifacts before
+upgrading. Links to existing files inside the bundle continue to work. Keep
+the output directory private throughout each run.
+
+### Fixes and maintenance
+
+- Load CLI config modules from paths containing spaces, `#`, or `%` using
+  native file URLs.
+- Validate the filesystem targets of bundle files, including symbolic links,
+  during manifest loading and before artifact, observation, and report I/O.
+- Limit the npm package to compiled core modules and the toy, rule-based
+  judge, and LLM adapter examples. All files shipped in 0.1.4 are retained.
+  The package check imports the installed example entrypoints.
+- Update the Vitest development dependencies and run CI on Node.js 22,
+  24, and 26. The installed package also receives a Node.js 18 compatibility
+  check. Trusted Publishing uses a patched Node.js 24 runtime.
+
 ## 0.1.4
 
 ### Fixed

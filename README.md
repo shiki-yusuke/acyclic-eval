@@ -69,8 +69,7 @@ needs no credentials or network after `npm ci`.
 
 ### Packaged quick start
 
-The following sequence is verified against `acyclic-eval@0.1.4` installed from
-the npm registry:
+Run the bundled toy configuration after installing the npm package.
 
 ```bash
 npm install acyclic-eval
