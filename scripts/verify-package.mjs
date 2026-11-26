@@ -9,7 +9,7 @@ const sandbox = mkdtempSync(path.join(tmpdir(), "acyclic-eval-package-"));
 const cache = path.join(sandbox, "npm-cache");
 const packDirectory = path.join(sandbox, "pack");
 // A native ESM import must treat the consumer directory as a filesystem path.
-const consumer = path.join(sandbox, "consumer #1 100%");
+const consumer = path.join(sandbox, "workspace #1 100%", "consumer");
 const output = path.join(consumer, "out");
 const env = { ...process.env, npm_config_cache: cache, npm_config_audit: "false", npm_config_fund: "false" };
 
@@ -19,7 +19,7 @@ function run(command, args, cwd = root) {
 
 try {
   mkdirSync(packDirectory);
-  mkdirSync(consumer);
+  mkdirSync(consumer, { recursive: true });
   const packed = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", packDirectory]));
   const packageInfo = packed[0];
   if (!packageInfo?.filename || !Array.isArray(packageInfo.files)) {
