@@ -27,9 +27,6 @@ interface EntryOutcome {
   readonly okCount: number;
   readonly infraErrorCount: number;
   readonly passCount: number;
-  readonly lastActual?: unknown;
-  readonly lastError?: string;
-  readonly lastDetail?: string;
   readonly classifications: Array<"tp" | "tn" | "fp" | "fn">;
 }
 
@@ -91,14 +88,14 @@ export function score<TExpected, TActual>(
     }
   }
 
+  const mismatches: CaseMismatch[] = [];
   const outcomes: EntryOutcome[] = manifest.entries.map((entry) => {
     const obsList = byCaseId.get(entry.caseId) ?? [];
     let okCount = 0;
     let infraErrorCount = 0;
     let passCount = 0;
-    let lastActual: unknown;
+    let failure: { sampleIndex: number; actual: unknown; detail?: string } | undefined;
     let lastError: string | undefined;
-    let lastDetail: string | undefined;
     const classifications: Array<"tp" | "tn" | "fp" | "fn"> = [];
 
     for (const obs of obsList) {
@@ -108,16 +105,28 @@ export function score<TExpected, TActual>(
         continue;
       }
       okCount += 1;
-      lastActual = obs.actual;
       const comparison = comparator.compare(entry.expected as ExpectedSpec<TExpected>, obs.actual as TActual);
-      lastDetail = comparison.detail;
-      if (comparison.pass) passCount += 1;
+      if (comparison.pass) {
+        passCount += 1;
+      } else if (!failure || obs.sampleIndex < failure.sampleIndex) {
+        failure = { sampleIndex: obs.sampleIndex, actual: obs.actual, detail: comparison.detail };
+      }
       if (options.metricAdapter) {
         classifications.push(options.metricAdapter.classify(entry.expected as ExpectedSpec<TExpected>, obs.actual as TActual, comparison));
       }
     }
 
-    return { entry, okCount, infraErrorCount, passCount, lastActual, lastError, lastDetail, classifications };
+    if (failure) {
+      mismatches.push({
+        caseId: entry.caseId,
+        operatorId: entry.operatorId,
+        target: entry.target,
+        expected: entry.expected,
+        ...failure,
+        error: lastError,
+      });
+    }
+    return { entry, okCount, infraErrorCount, passCount, classifications };
   });
 
   const byOperatorId = new Map<string, EntryOutcome[]>();
@@ -182,18 +191,6 @@ export function score<TExpected, TActual>(
       recall: tp + fn === 0 ? null : tp / (tp + fn),
     };
   }
-
-  const mismatches: CaseMismatch[] = outcomes
-    .filter((o) => o.okCount > 0 && o.passCount < o.okCount)
-    .map((o) => ({
-      caseId: o.entry.caseId,
-      operatorId: o.entry.operatorId,
-      target: o.entry.target,
-      expected: o.entry.expected,
-      actual: o.lastActual,
-      error: o.lastError,
-      detail: o.lastDetail,
-    }));
 
   // Denominator is every operator in the manifest, not just the ones with materialsSelected > 0
   // -- a zero-coverage operator must pull this ratio down, not be excluded from it (see

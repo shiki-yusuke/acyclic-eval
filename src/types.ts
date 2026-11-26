@@ -251,7 +251,10 @@ export interface CaseMismatch {
   readonly operatorId: string;
   readonly target: unknown;
   readonly expected: ExpectedSpec<unknown>;
+  /** Lowest zero-based sample index that failed comparison. Reports before 0.2.1 omit it. */
+  readonly sampleIndex?: number;
   readonly actual?: unknown;
+  /** Last recorded infrastructure error for this case, which can come from another sample. */
   readonly error?: string;
   readonly detail?: string;
 }

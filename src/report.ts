@@ -56,6 +56,7 @@ export function formatReport(report: ScoreReport): { json: string; markdown: str
     for (const m of report.mismatches) {
       lines.push(`### ${m.caseId}`, "");
       lines.push(`- operator: ${m.operatorId}`);
+      if (m.sampleIndex !== undefined) lines.push(`- sample index (zero-based): ${m.sampleIndex}`);
       lines.push(`- expected: \`${JSON.stringify(m.expected)}\``);
       lines.push(`- actual: \`${m.actual === undefined ? "(none)" : JSON.stringify(m.actual)}\``);
       if (m.error) lines.push(`- error: ${m.error}`);
