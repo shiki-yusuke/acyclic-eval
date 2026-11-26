@@ -31,8 +31,10 @@
     "acyclic-eval": "dist/src/cli.js"
   },
   "files": [
-    "dist",
-    "!dist/**/*.map"
+    "dist/src/*.{js,d.ts}",
+    "dist/examples/toy/*.{js,d.ts}",
+    "dist/examples/rule-based-judge/*.{js,d.ts}",
+    "dist/examples/llm-judge-adapter/*.{js,d.ts}"
   ],
   "exports": {
     ".": {

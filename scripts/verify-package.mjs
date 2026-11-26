@@ -28,7 +28,15 @@ try {
   const packagedFiles = packageInfo.files.map((file) => file.path);
   // npm pack --json reports paths relative to the package root (without the
   // `package/` prefix that `tar -tf` would display).
-  const required = ["dist/src/cli.js", "dist/examples/toy/config.js"];
+  const required = [
+    "dist/src/cli.js",
+    "dist/src/index.js",
+    "dist/src/index.d.ts",
+    "dist/examples/toy/config.js",
+    "dist/examples/rule-based-judge/config.js",
+    "dist/examples/llm-judge-adapter/adapter.js",
+  ];
+  const publishedModule = /^dist\/(?:src|examples\/(?:toy|rule-based-judge|llm-judge-adapter))\/[^/]+\.(?:js|d\.ts)$/;
   const prohibited = [
     /(^|\/)\.env(?:\.|$)/,
     /^(?:test|docs|coverage)\//,
@@ -39,6 +47,9 @@ try {
     if (!packagedFiles.includes(item)) throw new Error(`Packed tarball is missing required file: ${item}`);
   }
   for (const item of packagedFiles) {
+    if (item.startsWith("dist/") && !publishedModule.test(item)) {
+      throw new Error(`Unexpected build output in the npm package: ${item}`);
+    }
     if (prohibited.some((pattern) => pattern.test(item))) {
       throw new Error(`Packed tarball contains a prohibited file: ${item}`);
     }
