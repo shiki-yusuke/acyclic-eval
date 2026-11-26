@@ -48,8 +48,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run typecheck && vitest run",
-    "test:watch": "vitest",
+    "test": "npm run typecheck && vitest run --dir test",
+    "test:watch": "vitest --dir test",
     "example": "npm run build && node dist/examples/toy/run.js",
     "demo": "npm run build && ./scripts/demo.sh",
     "check:docs": "node scripts/check-doc-links.mjs && node scripts/check-readme-sync.mjs",

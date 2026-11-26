@@ -9,6 +9,10 @@ tarball in a separate runtime smoke test.
 
 ## Setup and checks
 
+Put test suites under `test/`. Both `npm test` and `npm run test:watch`
+discover tests there, so local backups elsewhere in the checkout stay
+outside the test run.
+
 ```bash
 npm ci
 npm run typecheck
