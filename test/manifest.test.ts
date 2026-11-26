@@ -1,9 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AcyclicEvalError } from "../src/errors.js";
+import { readObservations } from "../src/evaluate.js";
 import { artifactRelPath, readArtifact, readManifest, resolveArtifactPath, writeArtifact, writeManifest } from "../src/manifest.js";
+import { score } from "../src/score.js";
 import type { ManifestEntry } from "../src/types.js";
 
 let outDir: string;
@@ -163,6 +165,41 @@ describe("resolveArtifactPath / readArtifact: path escape defense in depth", () 
     expect(() => resolveArtifactPath(outDir, "artifacts/case-1.json")).not.toThrow();
   });
 
+  it("allows a new artifact below an in-bundle directory link", () => {
+    const store = path.join(outDir, "store");
+    mkdirSync(store);
+    symlinkSync(store, path.join(outDir, "artifacts"), "junction");
+    const { artifactUri, artifactDigest } = writeArtifact(outDir, "linked-case", { value: 1 });
+    expect(resolveArtifactPath(outDir, artifactUri)).toBe(path.join(outDir, artifactUri));
+    expect(readArtifact(outDir, makeEntry({ artifactUri, artifactDigest }))).toEqual({ value: 1 });
+  });
+
+  it("checks directory link targets when resolving names for a bundle", () => {
+    const bundle = path.join(outDir, "bundle");
+    const sibling = path.join(outDir, "sibling");
+    mkdirSync(bundle);
+    mkdirSync(sibling);
+    symlinkSync(sibling, path.join(bundle, "linked"), "junction");
+    expect(() => resolveArtifactPath(bundle, "linked")).toThrow(AcyclicEvalError);
+    expect(() => resolveArtifactPath(bundle, "linked/new/file.json")).toThrow(AcyclicEvalError);
+  });
+
+  it("rejects an unresolved link before creating an artifact", () => {
+    symlinkSync(path.join(outDir, "missing"), path.join(outDir, "artifacts"), "junction");
+    expect(() => writeArtifact(outDir, "new-case", {})).toThrow(AcyclicEvalError);
+    expect(existsSync(path.join(outDir, "missing"))).toBe(false);
+  });
+
+  it("accepts a caller-selected linked output directory", () => {
+    const store = path.join(outDir, "store");
+    const bundle = path.join(outDir, "bundle");
+    mkdirSync(store);
+    symlinkSync(store, bundle, "junction");
+    writeManifest(bundle, [], []);
+    expect(readManifest(bundle).entries).toEqual([]);
+    expect(resolveArtifactPath(bundle, "manifest.json")).toBe(path.join(bundle, "manifest.json"));
+  });
+
   it("readArtifact refuses to read an artifact referenced by an escaping artifactUri, even if constructed directly (not via readManifest)", () => {
     const entry = makeEntry({ artifactUri: "../outside.json" });
     expect(() => readArtifact(outDir, entry)).toThrow(/path escape/);
@@ -181,4 +218,29 @@ describe("artifactRelPath: Windows-compatible filenames", () => {
     expect(relPath).not.toMatch(/[/\\]etc/);
     expect(relPath.startsWith("artifacts/")).toBe(true);
   });
+});
+
+describe("fixed bundle filenames", () => {
+  it.each(["manifest.json", "observations.jsonl", "report.json", "report.md"])(
+    "validates the location of %s before using it",
+    (name) => {
+      const bundle = path.join(outDir, "bundle");
+      const emptyDirectory = path.join(outDir, "empty");
+      mkdirSync(bundle);
+      mkdirSync(emptyDirectory);
+      if (name !== "manifest.json") writeManifest(bundle, [], []);
+      symlinkSync(emptyDirectory, path.join(bundle, name), "junction");
+
+      if (name === "manifest.json") {
+        expect(() => readManifest(bundle)).toThrow(/path escape/);
+        expect(() => writeManifest(bundle, [], [])).toThrow(/path escape/);
+      } else if (name === "observations.jsonl") {
+        expect(() => readObservations(bundle)).toThrow(/path escape/);
+      } else {
+        const comparator = { id: "test", version: "1", compare: () => ({ pass: true }) };
+        expect(() => score(bundle, comparator)).toThrow(/path escape/);
+        if (name === "report.md") expect(existsSync(path.join(bundle, "report.json"))).toBe(false);
+      }
+    },
+  );
 });

@@ -3,6 +3,17 @@ import path from "node:path";
 import { CURRENT_SCHEMA_VERSION, type ExpectedSpec, type GenerationOperatorStats, type Manifest, type ManifestEntry } from "./types.js";
 import { sha256Hex } from "./digest.js";
 import { AcyclicEvalError } from "./errors.js";
+import { resolveOutputPath } from "./output-path.js";
+
+/** Validate the target and preserve the absolute spelling of the caller's path. */
+export function resolveArtifactPath(outDir: string, artifactUri: string): string {
+  try {
+    resolveOutputPath(outDir, artifactUri);
+  } catch (error) {
+    throw new AcyclicEvalError(`invalid manifest artifactUri "${artifactUri}": ${(error as Error).message}`);
+  }
+  return path.resolve(outDir, artifactUri);
+}
 
 const MANIFEST_FILE = "manifest.json";
 const ARTIFACT_DIR = "artifacts";
@@ -17,29 +28,9 @@ export function artifactRelPath(caseId: string): string {
   return path.posix.join(ARTIFACT_DIR, `${safe}.json`);
 }
 
-/**
- * Resolves an `artifactUri` against `outDir` and refuses to return a path
- * that escapes it -- a manifest is meant to be a self-contained, portable
- * bundle, and there's no legitimate reason for an entry to point outside its
- * own outDir (whether the escaping path got there by a hand-edited manifest,
- * a buggy writer, or something adversarial).
- */
-export function resolveArtifactPath(outDir: string, artifactUri: string): string {
-  const resolvedOutDir = path.resolve(outDir);
-  const resolvedPath = path.resolve(resolvedOutDir, artifactUri);
-  const relative = path.relative(resolvedOutDir, resolvedPath);
-  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-    throw new AcyclicEvalError(
-      `manifest entry references an artifactUri ("${artifactUri}") that resolves outside outDir ` +
-        `("${outDir}"). Refusing to read it -- this looks like a path escape.`,
-    );
-  }
-  return resolvedPath;
-}
-
 export function writeArtifact(outDir: string, caseId: string, input: unknown): { artifactUri: string; artifactDigest: string } {
   const relPath = artifactRelPath(caseId);
-  const fullPath = path.join(outDir, relPath);
+  const fullPath = resolveOutputPath(outDir, relPath);
   mkdirSync(path.dirname(fullPath), { recursive: true });
   const content = JSON.stringify(input, null, 2);
   writeFileSync(fullPath, content);
@@ -47,7 +38,7 @@ export function writeArtifact(outDir: string, caseId: string, input: unknown): {
 }
 
 export function readArtifact<TCaseInput>(outDir: string, entry: ManifestEntry): TCaseInput {
-  const fullPath = resolveArtifactPath(outDir, entry.artifactUri);
+  const fullPath = resolveOutputPath(outDir, entry.artifactUri);
   const content = readFileSync(fullPath, "utf8");
   const digest = sha256Hex(content);
   if (digest !== entry.artifactDigest) {
@@ -67,7 +58,7 @@ export function writeManifest(outDir: string, entries: ManifestEntry[], operator
     operatorStats,
   };
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(path.join(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2));
+  writeFileSync(resolveOutputPath(outDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2));
   return manifest;
 }
 
@@ -122,7 +113,7 @@ function assertManifestEntry(v: unknown, index: number, outDir: string): Manifes
  * "not a JSON object" error a bare array would otherwise produce.
  */
 export function readManifest(outDir: string): Manifest {
-  const fullPath = path.join(outDir, MANIFEST_FILE);
+  const fullPath = resolveOutputPath(outDir, MANIFEST_FILE);
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(fullPath, "utf8"));
