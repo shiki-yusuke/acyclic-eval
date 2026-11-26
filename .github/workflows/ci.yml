@@ -42,6 +42,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - run: npm run typecheck:node18
       - run: npm run build
       - name: Pack candidate
         shell: bash

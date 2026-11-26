@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The compatibility check tracks the published Node.js 18 runtime.
+      - dependency-name: "@node18-compat/node"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-dependencies:
         patterns:
