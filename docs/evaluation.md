@@ -11,6 +11,12 @@ Report the corpus, operator versions, judge id/version, comparator, coverage,
 and configured score gates with every result. A pass rate without those inputs
 is not an interpretable claim.
 
+For a case evaluated more than once, the mismatch in `report.json` and
+`report.md` shows the actual value and comparison detail from the failing
+sample with the lowest zero-based `sampleIndex`. Use the case ID and index
+to find that sample in `observations.jsonl`. A reported infrastructure error
+may come from a different sample of the same case.
+
 ## Bundled toy demonstration
 
 The package's quickstart runs a rule-based transcript Judge over three
