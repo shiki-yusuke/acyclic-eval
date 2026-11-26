@@ -59,7 +59,7 @@ npm run demo
 
 ### パッケージ版 Quick start
 
-次の手順は npm registry の `acyclic-eval@0.1.4` からインストールして検証済みです。
+npm パッケージに同梱している toy 設定を使って、生成から採点まで実行できます。
 
 ```bash
 npm install acyclic-eval
