@@ -4,6 +4,20 @@ All notable changes to acyclic-eval are documented here. This project is
 pre-1.0; breaking changes between minor releases may occur without a
 deprecation period.
 
+## 0.2.1
+
+- For each case with a failed comparison, `score()` reports the actual value
+  and comparator detail from the failing sample with the lowest zero-based
+  `sampleIndex`. A later passing sample could previously appear in that slot.
+- JSON reports retain schema version 1 and add an optional `sampleIndex` to
+  each mismatch. Markdown shows the same index. The `error` field still
+  records the most recent infrastructure error for the case, which can come
+  from a different sample. Existing report JSON can still be rendered.
+  Refresh snapshots that include changed mismatch records.
+  [Scoring fix and regression tests](https://github.com/shiki-yusuke/acyclic-eval/pull/11)
+- Dependabot checks npm and GitHub Actions weekly and groups minor and patch
+  updates within each ecosystem.
+
 ## 0.2.0
 
 ### Migration
