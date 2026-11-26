@@ -3,11 +3,11 @@
 // the exact same observations for free.
 
 import { writeFileSync } from "node:fs";
-import path from "node:path";
 import { digestOfValue } from "./digest.js";
 import { AcyclicEvalError } from "./errors.js";
 import { readObservations } from "./evaluate.js";
 import { readArtifact, readManifest } from "./manifest.js";
+import { resolveOutputPath } from "./output-path.js";
 import { formatReport } from "./report.js";
 import type {
   CaseMismatch,
@@ -231,8 +231,10 @@ export function score<TExpected, TActual>(
   };
 
   const { json, markdown } = formatReport(report);
-  writeFileSync(path.join(outDir, "report.json"), json);
-  writeFileSync(path.join(outDir, "report.md"), markdown);
+  const jsonPath = resolveOutputPath(outDir, "report.json");
+  const markdownPath = resolveOutputPath(outDir, "report.md");
+  writeFileSync(jsonPath, json);
+  writeFileSync(markdownPath, markdown);
 
   return report;
 }

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -161,6 +161,30 @@ describe("resolveArtifactPath / readArtifact: path escape defense in depth", () 
 
   it("resolveArtifactPath accepts a normal within-outDir relative path", () => {
     expect(() => resolveArtifactPath(outDir, "artifacts/case-1.json")).not.toThrow();
+  });
+
+  it("allows a new artifact below an in-bundle directory link", () => {
+    const store = path.join(outDir, "store");
+    mkdirSync(store);
+    symlinkSync(store, path.join(outDir, "artifacts"), "junction");
+    const { artifactUri, artifactDigest } = writeArtifact(outDir, "linked-case", { value: 1 });
+    expect(resolveArtifactPath(outDir, artifactUri)).toBe(path.join(realpathSync(store), "linked-case.json"));
+    expect(readArtifact(outDir, makeEntry({ artifactUri, artifactDigest }))).toEqual({ value: 1 });
+  });
+
+  it("checks directory link targets when resolving names for a bundle", () => {
+    const bundle = path.join(outDir, "bundle");
+    const sibling = path.join(outDir, "sibling");
+    mkdirSync(bundle);
+    mkdirSync(sibling);
+    symlinkSync(sibling, path.join(bundle, "linked"), "junction");
+    expect(() => resolveArtifactPath(bundle, "linked")).toThrow(AcyclicEvalError);
+    expect(() => resolveArtifactPath(bundle, "linked/new/file.json")).toThrow(AcyclicEvalError);
+  });
+
+  it("rejects an unresolved link before creating an artifact", () => {
+    symlinkSync(path.join(outDir, "missing"), path.join(outDir, "artifacts"), "junction");
+    expect(() => writeArtifact(outDir, "new-case", {})).toThrow();
   });
 
   it("readArtifact refuses to read an artifact referenced by an escaping artifactUri, even if constructed directly (not via readManifest)", () => {

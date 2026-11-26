@@ -13,10 +13,10 @@
 // never see `expected`, `target`, `operatorId`, or `tags`.
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { digestOfValue } from "./digest.js";
 import { AcyclicEvalError } from "./errors.js";
 import { readArtifact, readManifest } from "./manifest.js";
+import { resolveOutputPath } from "./output-path.js";
 import { runPool, runWithRetryAndTimeout } from "./runner.js";
 import type { EvaluateSummary, Judge, ManifestEntry, Observation, RunnerOptions } from "./types.js";
 
@@ -108,7 +108,7 @@ export async function evaluate<TCaseInput, TActual>(
   const backoffMs = options.retry?.backoffMs ?? 0;
   const resume = options.resume ?? true;
 
-  const obsPath = path.join(outDir, OBSERVATIONS_FILE);
+  const obsPath = resolveOutputPath(outDir, OBSERVATIONS_FILE);
 
   let recordedByKey = new Map<string, Observation>();
   if (!resume) {
@@ -194,7 +194,7 @@ export async function evaluate<TCaseInput, TActual>(
       ? { ...base, status: "ok", actual: outcome.value }
       : { ...base, status: "infra_error", error: outcome.error };
 
-    appendFileSync(obsPath, `${JSON.stringify(observation)}\n`);
+    appendFileSync(resolveOutputPath(outDir, OBSERVATIONS_FILE), `${JSON.stringify(observation)}\n`);
     if (observation.status === "ok") okSamples += 1;
     else infraErrorSamples += 1;
   });
@@ -217,5 +217,5 @@ export async function evaluate<TCaseInput, TActual>(
  * thrown; any other malformed line throws `AcyclicEvalError`.
  */
 export function readObservations(outDir: string): ParsedObservationsFile {
-  return readObservationsFile(path.join(outDir, OBSERVATIONS_FILE), `scoring ${outDir}`);
+  return readObservationsFile(resolveOutputPath(outDir, OBSERVATIONS_FILE), `scoring ${outDir}`);
 }

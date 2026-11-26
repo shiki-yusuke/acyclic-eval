@@ -14,7 +14,10 @@ framework and must be reviewed by the integrator.
   `observations.jsonl` as potentially sensitive. Redact them before sharing.
 - Run `generate` separately from `evaluate` when feasible, with no Judge
   credentials in the generation environment.
-- Use an output directory with appropriate local access controls.
+- Use a private output directory that you control throughout the run. Bundle
+  file paths and existing symbolic links must resolve inside that directory.
+  When importing data, copy regular files into a fresh directory. Filesystem
+  permissions protect the files from concurrent changes by other users.
 - Do not use `unknown` output as a pretext to expose more source material than
   is necessary for review.
 
