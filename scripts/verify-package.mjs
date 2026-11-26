@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sandbox = mkdtempSync(path.join(tmpdir(), "acyclic-eval-package-"));
@@ -36,7 +36,8 @@ try {
     "dist/examples/rule-based-judge/config.js",
     "dist/examples/llm-judge-adapter/adapter.js",
   ];
-  const publishedModule = /^dist\/(?:src|examples\/(?:toy|rule-based-judge|llm-judge-adapter))\/[^/]+\.(?:js|d\.ts)$/;
+  // Review this check alongside the files list whenever an example is published.
+  const publishedModule = /^dist\/(?:src|examples\/(?:toy|rule-based-judge|llm-judge-adapter))\/.+\.(?:js|d\.ts)$/;
   const prohibited = [
     /(^|\/)\.env(?:\.|$)/,
     /^(?:test|docs|coverage)\//,
@@ -61,7 +62,13 @@ try {
   run("npm", ["init", "--yes"], consumer);
   run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumer);
 
-  const config = path.join(consumer, "node_modules", "acyclic-eval", "dist", "examples", "toy", "config.js");
+  const examples = path.join(consumer, "node_modules", "acyclic-eval", "dist", "examples");
+  const rules = await import(pathToFileURL(path.join(examples, "rule-based-judge", "config.js")).href);
+  const adapter = await import(pathToFileURL(path.join(examples, "llm-judge-adapter", "adapter.js")).href);
+  if ([rules.generateConfig, rules.evaluateConfig, rules.scoreConfig, adapter.createLlmJudge].some((fn) => typeof fn !== "function")) {
+    throw new Error("Installed examples must expose their documented entrypoints.");
+  }
+  const config = path.join(examples, "toy", "config.js");
   const cli = path.join(consumer, "node_modules", "acyclic-eval", "dist", "src", "cli.js");
   const bin = path.join(consumer, "node_modules", ".bin", "acyclic-eval");
   const directHelp = run(process.execPath, [cli, "--help"], consumer);
